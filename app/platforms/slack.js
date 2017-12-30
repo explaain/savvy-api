@@ -90,9 +90,6 @@ const transformMessage = function(botKeychain, message) {
 
 	console.log("🔧🔧⚙️🔬 Transforming an API-able message: ", message)
 
-	// Remove reference to @forgetmenot
-	if(message.text) message.text = message.text.replace(message.formsOfAddress, '')
-
 	return message;
 }
 
@@ -106,11 +103,8 @@ exports.handleMessage = (botKeychain, message) => new Promise((resolve, reject) 
 	// Respond only when the bot's involved
 	// But not if it's the bot posting.
 	// logger.log("Event heard", message)
-	if(message.type === 'desktop_notification' || (message.text && !message.formsOfAddress.test(message.text)) || message.bot_id) {
-		message.usable = false
-	} else {
-		message.usable = true
-	}
+	message.usable = (message.type !== 'desktop_notification' && (!message.text || message.formsOfAddress.test(message.text)) && !message.bot_id)
+
 	// Gendit bot post, ABORT
 	if(!message.usable) {
 		console.log('aborting!')
@@ -118,6 +112,9 @@ exports.handleMessage = (botKeychain, message) => new Promise((resolve, reject) 
 		return false
 	}
 	console.log('😈 CHATBOT listens to:', message)
+
+	// Remove reference to @forgetmenot
+	if(message.text) message.text = message.text.replace(message.formsOfAddress, '')
 
 	// Transform into Facebook format.
 	var messagePackage = { entry: [ { messaging: [ {
