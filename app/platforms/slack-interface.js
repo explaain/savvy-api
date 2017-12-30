@@ -70,18 +70,10 @@ const initateSlackBot = function(thisBotKeychain) {
 		// Only listen for text messages... for now.
 		if(message.type !== 'message') return false;
 
-		// * Transform the message so the bot replies to the right user/channel etc.
-		// * Get rid of unwanted addressing (e.g. @forgetmenot)
-		message = slack.transformMessage(thisBotKeychain, message)
-
-		// Gendit bot post, ABORT
-		if(!message.usable) return false;
-		console.log('😈 CHATBOT listens to:', message)
-
 		// Should send data to Chatbot and return messages for emitting
 		// TODO: Support postEphemeral(id, user, text, params) for slash commands
 		rtm.sendTyping(message.channel)
-		slack.handleMessage(message)
+		slack.handleMessage(thisBotKeychain, message)
 	})
 }
 

@@ -1,5 +1,5 @@
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'debug'})
+const logger = tracer.colorConsole({level: 'trace'})
 const AlgoliaSearch = require('algoliasearch')
 
 const Index = class Index {
@@ -10,6 +10,7 @@ const Index = class Index {
     this.AlgoliaIndex = client.initIndex(indexID)
   }
   getObject(objectID, attributesToRetrieve) {
+    logger.trace('getObject', objectID, attributesToRetrieve)
     const self = this
     return new Promise((resolve, reject) => {
       self.AlgoliaIndex.getObject(objectID, attributesToRetrieve, (err, content) => {

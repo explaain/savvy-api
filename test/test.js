@@ -1281,65 +1281,64 @@ describe('Bulk', function() {
   })
 
   describe('Slack', function() {
-    const messageTemplate = { type: 'message',
+    const slackKeychain = {
+      bot_access_token: 'xoxb-252522692578-W3sj1kTnLfSKjup8Vc4TTvRm',
+      bot_user_id: 'D7EH3CKCL'
+    }
+    const messageTemplate = {
+      type: 'message',
       channel: 'D7EH3CKCL',
       user: 'U04NVHJFD',
       ts: '1514506085.000191',
       source_team: 'T04NVHJBK',
-      team: 'T04NVHJBK',
-      channelType: 'D',
-      sender: 'U04NVHJFD',
-      formsOfAddress: /(?:)/i,
-      usable: true
+      team: 'T04NVHJBK'
     }
-    const sendTextMessage = async text => {
+    const sendSlackMessage = async text => {
       const message = JSON.parse(JSON.stringify(messageTemplate))
       message.text = text
-      return await slack.handleMessage(message)
+      return await slack.handleMessage(slackKeychain, message)
     }
     describe('Say hello', function() {
       var result
       before(async () => {
-        result = await sendTextMessage('hi')
+        result = await sendSlackMessage('hi')
         return
       })
       it('should return to the correct recipient', () => {
-        assert.equal(result[0].data.recipient, messageTemplate.channel)
+        logger.debug(result[0])
+        assert.equal(result[0].recipient, messageTemplate.channel)
       })
       it('should return a text message', () => {
-        console.log(result[0].data.message.text)
-        assert(result[0].data.message.text)
+        assert(result[0].text)
       })
       it('should return a greeting', () => {
-        assert(['Hello there!', 'Nice to see you', 'Hi 😊', 'Hello 🙂'].indexOf(result[0].data.message.text) > -1)
+        assert(['Hello there!', 'Nice to see you', 'Hi 😊', 'Hello 🙂'].indexOf(result[0].text) > -1)
       })
     })
     describe('Ask how often Savvy indexes files', function() {
       var result
       before(async () => {
-        result = await sendTextMessage('How often does Savvy index files?')
+        result = await sendSlackMessage('How often does Savvy index files?')
         return
       })
       it('should return a text message', () => {
-        console.log(result[0].data.message.text)
-        assert(result[0].data.message.text)
+        assert(result[0].text)
       })
       it('should return the answer', () => {
-        assert.equal(result[0].data.message.text, 'How often does Savvy index files?\n\n- Every 60 seconds')
+        assert.equal(result[0].text, 'How often does Savvy index files?\n\n- Every 60 seconds')
       })
     })
     describe('Store the company address', function() {
       var result
       before(async () => {
-        result = await sendTextMessage('The company address is 123 Fake Street')
+        result = await sendSlackMessage('The company address is 123 Fake Street')
         return
       })
       it('should return a text message', () => {
-        console.log(result[0].data.message.text)
-        assert(result[0].data.message.text)
+        assert(result[0].text)
       })
       it('should return confirmation', () => {
-        assert.equal(result[0].data.message.text, 'I\'ve now remembered that for you! The company address is 123 Fake Street')
+        assert.equal(result[0].text, 'I\'ve now remembered that for you! The company address is 123 Fake Street')
       })
     })
   })

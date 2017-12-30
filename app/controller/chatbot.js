@@ -22,7 +22,7 @@ const Randoms = require('../controller/cannedResponses.js').Randoms
 
 
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'debug'});
+const logger = tracer.colorConsole({level: 'trace'});
 // tracer.setLevel('error');
 
 const C = {}; // C is for Context
@@ -114,11 +114,11 @@ exports.fbInformation = function() {
 	}
 */
 exports.handleMessage = function(body) {
-	logger.trace('handleMessage', body)
+	logger.trace('handleMessage', body, JSON.stringify(body))
 	const d = Q.defer()
 	try {
 		body.entry[0].messaging.forEach(function(event) {
-			sender = event.sender.id;
+			sender = event.sender;
 			if (!C[sender]) C[sender] = {
 				lastResults: [],
 				consecutiveFails: 0,
@@ -134,12 +134,10 @@ exports.handleMessage = function(body) {
 				firstPromise = handlePostbacks({sender: sender}, postback)
 				logger.trace()
 			} else if (event.message) {
-				logger.trace(event.message)
 				if (event.message.quick_reply) {
 					//sendSenderAction(sender, 'mark_seen');
 					firstPromise = handleQuickReplies({sender: sender}, event.message.quick_reply)
 				}	else if ((text = event.message.text)) {
-					logger.trace(text)
 					//sendSenderAction(sender, 'typing_on'); // Ideally this would happen after checking we actually want to respond
 					// Handle a text message from this sender
 					switch(text) {
@@ -177,7 +175,6 @@ exports.handleMessage = function(body) {
 							updateUserLocation(sender, "Bristol")
 							break;
 						default: {
-							logger.trace()
 							var result = {}
 							const extraData = event.message.attachments ? { attachments: event.message.attachments } : null
 							firstPromise = intentConfidence(sender, text, { platform: event.platform })
@@ -441,9 +438,9 @@ function giveUp(sender) {
 	sendGenericMessage(sender, 'dunno', getContext(sender, 'consecutiveFails'));
 }
 
-function sendGenericMessage(recipientId, type, counter) {
+function sendGenericMessage(recipient, type, counter) {
+	logger.trace(sendGenericMessage, recipient, type, counter)
 	const d = Q.defer()
-	logger.trace(sendGenericMessage);
   // Bot didnt know what to do with message from user
 	if (!Randoms.texts[type])
 		type = 'dunno';
@@ -455,13 +452,12 @@ function sendGenericMessage(recipientId, type, counter) {
 	if (typeof counter!=undefined) counter = 0
 	const text = (Array.isArray(Randoms.texts[type][0])) ? Randoms.texts[type][counter] : Randoms.texts[type];
   var messageData = {
-    recipient: {
-      id: recipientId
-    },
+    recipient: recipient,
     message: {
       text: text[Math.floor(Math.random() * text.length)]
     }
   };
+	logger.trace('messageData', messageData)
   return messageData
 
 	// now won't do this yet
@@ -472,9 +468,7 @@ function sendGenericMessage(recipientId, type, counter) {
 				const gif = (Array.isArray(Randoms.gifs[type][0])) ? Randoms.gifs[type][counter] : Randoms.gifs[type];
 				if (gif) {
 					var messageData2 = {
-						recipient: {
-							id: recipientId
-						},
+						recipient: recipient,
 						message: {
 							attachment: {
 								type: "image",
@@ -507,17 +501,15 @@ const createMessagePromise = function(requestData, messageData) {
 }
 
 
-function createTextMessage(recipientId, message, quickReplies) {
-	logger.trace();
+function createTextMessage(recipient, message, quickReplies) {
+	logger.trace(createTextMessage, recipient, message, quickReplies)
 	try {
 
 		if (typeof message === 'string') {
 			message = {text: message}
 		}
 		const messageData = {
-			recipient: {
-				id: recipientId
-			},
+			recipient: recipient,
 			message: {}
 		};
 		if (message.text) {
@@ -544,14 +536,12 @@ function createTextMessage(recipientId, message, quickReplies) {
 		logger.error(e)
 	}
 }
-function getCarouselMessage(recipientId, elements, delay, quickReplies) {
+function getCarouselMessage(recipient, elements, delay, quickReplies) {
 	logger.trace(getCarouselMessage);
 	// messageText = messageText.replace(/"/g, '\"').replace(/'/g, '\'').replace(/\//g, '\/').replace(/‘/g, '\‘');
 	// messageText = messageText.replace(/"/g, '\"').replace(/'/g, '\'').replace(/\//g, '\/').replace(/‘/g, '\‘').replace(/’/g, '\’').replace(/’/g, '\’');
   var messageData = {
-    recipient: {
-      id: recipientId
-    },
+    recipient: recipient,
 		message: {
 			attachment: {
 				type: 'template',
@@ -566,7 +556,7 @@ function getCarouselMessage(recipientId, elements, delay, quickReplies) {
 	if (messageData.message.quick_replies && !messageData.message.quick_replies.length) delete messageData.message.quick_replies
   return messageData
 }
-// function sendAttachmentMessage(recipientId, attachment, delay, quickReplies) {
+// function sendAttachmentMessage(recipient, attachment, delay, quickReplies) {
 // 	logger.trace()
 // 	const messageAttachment = attachment.attachment_id ? {
 // 		type: attachment.type,
@@ -580,9 +570,7 @@ function getCarouselMessage(recipientId, elements, delay, quickReplies) {
 // 		}
 // 	}
 //   var messageData = {
-//     recipient: {
-//       id: recipientId
-//     },
+//     recipient: recipient,
 //     message: {
 // 			attachment: messageAttachment
 //     }
@@ -590,12 +578,10 @@ function getCarouselMessage(recipientId, elements, delay, quickReplies) {
 // 	messageData.message.quick_replies = getQuickReplies(quickReplies, !quickReplies || quickReplies.length)
 //   return d.resolve(messageData);
 // }
-function sendCorrectionMessage(recipientId) {
+function sendCorrectionMessage(recipient) {
 	logger.trace();
   var messageData = {
-    recipient: {
-      id: recipientId
-    },
+    recipient: recipient,
     message: {
 			text: "Whoops - was there something you would have preferred me to do?"
     }
@@ -625,7 +611,7 @@ function sendCorrectionMessage(recipientId) {
   return messageData
 }
 
-function firstMessage(recipientId) {
+function firstMessage(recipient) {
 	logger.trace();
 	setContext(sender, 'onboarding', true);
 
@@ -639,9 +625,7 @@ function firstMessage(recipientId) {
 	const allMessageData = messages.map(function(text, i) {
 		return {
 			data: {
-				recipient: {
-					id: recipientId
-				},
+				recipient: recipient,
 				message: {
 					text: text
 				}
@@ -717,7 +701,7 @@ function intentConfidence(sender, message, extraData) {
 	}
   api.acceptRequest(data)
   .then(function(res) {
-		if (res.requestData.intent == "Default Fallback Intent")
+		if (res.requestData && res.requestData.intent == "Default Fallback Intent")
 			res.requestData.intent = 'query'
 		d.resolve(res)
   }).catch(function(e) {
@@ -840,6 +824,9 @@ const getResponseMessage = function(data) {
 		setContext(data.messageData[0].data.recipient.id, 'consecutiveFails', 0)
 	}
 
+	console.log(data)
+	console.log(data.messageData[0])
+	console.log(data.messageData[0].data)
 	return data
 }
 

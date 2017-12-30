@@ -5,7 +5,7 @@
   "scripts": {
     "start": "node ./bin/www",
     "test": "ALGOLIA_INDEX=ForgetMeNot_Context_Test mocha",
-    "test-single": "ALGOLIA_INDEX=ForgetMeNot_Context_Test mocha --grep 'Store the company address'"
+    "test-single": "ALGOLIA_INDEX=ForgetMeNot_Context_Test mocha --grep 'Say hello'"
   },
   "dependencies": {
     "@google/maps": "^0.3.1",

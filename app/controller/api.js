@@ -12,7 +12,7 @@
 
 
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'debug'})
+const logger = tracer.colorConsole({level: 'trace'})
 // tracer.setLevel('warn');
 const sinon = require('sinon')
 const Q = require("q")
@@ -176,21 +176,25 @@ exports.deleteMemories = (sender, apiKey, organisationID, objectID) => new Promi
     reject(e)
   })
 })
-
+/**
+ * Takes sender data and returns User object from database
+ *
+ * @param  {Object} req
+ * @param  {Object} req.sender
+ * @param  {String} req.text
+ * @param  {String} req.platform (Optional)
+ * @return {Object}
+ */
 exports.acceptRequest = async function(req) {
+  logger.trace('acceptRequest', req)
   try {
-    if (!req.content) req.content = { description: req.description || req.content || req.text || req.sentence }
-    if (!req.sender) req.sender = req.user ? req.user.uid : req.userID
     // req.verified allows platforms/slack.js to verify with a Slack-specific method - if we need to do Firebase-related stuff maybe we should check here too! But for that we'll need some sort of Firebase auth token (normally found only in browser?)...
-    if (!req.user || !req.user.uid || !req.user.idToken) {
-      req.user = await users.getUserByPlatform(req.platform, req.sender)
-      // req.sender = req.user.uid
+    req.sender = await users.getUserFromSender(req.sender, req.platform)
+    if (req.platform !== 'slack' || !req.sender.uid) {
+      await users.authenticateSender(req.sender)
+      await users.checkPermissions(req.organisationID, req.sender)
     }
-    if (req.platform !== 'slack' || !req.user.uid) {
-      await users.authenticateSender(req.user)
-      await users.checkPermissions(req.organisationID, req.user)
-    }
-    const nlpData = await nlp.process(req.sender, req.content.description, req.contexts)
+    const nlpData = await nlp.process(req.sender, req.text, req.contexts)
     req = combineObjects(req, nlpData)
     const result = await routeByIntent(req)
     if (!result.statusCode) result.statusCode = 200 //temp
@@ -206,9 +210,9 @@ exports.getUserData = function(req) {
   logger.trace('getUserData');
 	const d = Q.defer()
   logger.info(req)
-  users.authenticateSender(req.user)
-  .then(res => { return users.checkPermissions(req.organisationID, req.user) })
-  .then(res => { return users.getUserData(req.organisationID, req.user) })
+  users.authenticateSender(req.sender)
+  .then(res => { return users.checkPermissions(req.organisationID, req.sender) })
+  .then(res => { return users.getUserData(req.organisationID, req.sender) })
 	.then(function(result) {
     logger.trace()
     if (!result.statusCode) result.statusCode = 200 //temp
@@ -226,9 +230,9 @@ exports.getUserTeamDetails = function(req) {
     logger.trace('getUserTeamDetails');
     const d = Q.defer()
     logger.info(req)
-    users.authenticateSender(req.user)
-    // .then(res => { return users.checkPermissions(req.organisationID, req.user) })
-    .then(res => { return users.getUserTeamDetails(req.organisationID, req.user) })
+    users.authenticateSender(req.sender)
+    // .then(res => { return users.checkPermissions(req.organisationID, req.sender) })
+    .then(res => { return users.getUserTeamDetails(req.organisationID, req.sender) })
     .then(function(result) {
       logger.trace()
       if (!result.statusCode) result.statusCode = 200 //temp
@@ -284,7 +288,7 @@ exports.fetchMixpanelData = function(data) {
 
 
 const routeByIntent = function(requestData) {
-	logger.trace(routeByIntent)
+	logger.trace(routeByIntent, requestData)
 	const d = Q.defer()
   var memory = {}
   if (requestData.intent == 'setTask') requestData.intent = 'setTask.dateTime' //temporary
@@ -480,11 +484,11 @@ const recallMemory = function(requestData) {
 	logger.trace(recallMemory, requestData)
 	const d = Q.defer()
 	const searchTerm = requestData.resolvedQuery;// memory.context.map(function(e){return e.value}).join(' ');
-	users.fetchUserData(requestData.user.uid)
+	users.fetchUserData(requestData.sender.uid)
 	.then(function(userData) {
 		const readAccessList = userData.readAccess || []
     /* Temporarily allowing everything to search ACME userID */ readAccessList[readAccessList.length] = '101118387301286232222'
-		const userIdFilterString = 'userID: ' + requestData.user.uid + readAccessList.map(function(id) {return ' OR userID: '+id}).join('');
+		const userIdFilterString = 'userID: ' + requestData.sender.uid + readAccessList.map(function(id) {return ' OR userID: '+id}).join('');
 		const searchParams = {
 			query: searchTerm.substring(0, 500), // Only sends Algolia the first 511 characters as it can't hanlogger.tracee more than that
 			// filters: userIdFilterString,
@@ -492,7 +496,7 @@ const recallMemory = function(requestData) {
 			// filters: (attachments ? 'hasAttachments: true' : '')
 		};
     logger.trace(requestData, userData)
-    return searchForCards(requestData.user.algoliaApiKey, requestData.user.organisationID, searchParams)
+    return searchForCards(requestData.sender.algoliaApiKey, requestData.sender.organisationID, searchParams)
 	}).then(function(content) {
 		if (!content.hits.length) {
       logger.trace('No results found')
@@ -523,39 +527,13 @@ const recallMemory = function(requestData) {
 	return d.promise
 }
 
-
-
-// // Seems like this function is no longer necessary?
-// const storeMemory = function(memory, requestData) {
-// 	logger.trace(storeMemory)
-// 	logger.trace(memory)
-// 	logger.trace(requestData)
-// 	const d = Q.defer()
-// 	try {
-//     saveMemory(requestData.user.uid, memory, requestData)
-//     .then(function(memory) {
-//       d.resolve(memory);
-//     }).catch(function(e) {
-//       logger.error(e);
-//       d.reject(e);
-//     });
-// 	} catch (e) {
-// 		logger.error(e);
-// 		giveUp(sender);
-// 	}
-// 	return d.promise
-// }
-
-
-
-
 const saveMemory = function(m, requestData) {
 	logger.trace()
 	const d = Q.defer()
 	m.hasAttachments = !!(m.attachments) /* @TODO: investigate whether brackets are needed */
   // logger.info(m)
   var author
-  const uid = requestData.user.uid
+  const uid = requestData.sender.uid
   const memoryExists = !!m.objectID
   users.fetchUserData(uid)
   .then(function(res) {
@@ -592,9 +570,9 @@ const saveMemory = function(m, requestData) {
 		if (m.hasAttachments && url) m.attachments[0].url = url;
 		// if (memoryExists) {
     //   // logger.info(m)
-		// 	return updateDb(requestData.user, m, requestData)
+		// 	return updateDb(requestData.sender, m, requestData)
 		// } else {
-			return saveToDb(requestData.user, m, requestData)
+			return saveToDb(requestData.sender, m, requestData)
 		// }
 	}).then(function(m) {
 		d.resolve(m)
@@ -947,7 +925,7 @@ const getWrittenMemory = function(requestData) {
   var memory = requestData.parameters ? extractAllContext(requestData.parameters) : {}
   // logger.info('❇️ ❇️ ❇️ ' + requestData.intent)
   memory.intent = requestData.intent;
-  memory.author = requestData.user.uid;
+  memory.author = requestData.sender.uid;
   // memory.content = requestData.content || {
   //   description: rewriteSentence(requestData.resolvedQuery),
   //   listItems: requestData.listItems,

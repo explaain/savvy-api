@@ -7,7 +7,7 @@ const crypto = require("crypto")
 const Q = require("q")
 
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'debug'})
+const logger = tracer.colorConsole({level: 'trace'})
 // const debug = true
 // const logger = debug ? tracer.colorConsole({level: 'log'}) : {trace:()=>{},log:()=>{}}
 // tracer.setLevel('error')
@@ -56,19 +56,19 @@ function scopeMessage(botKeychain, message) {
 		// it's a public channel
 		case "C":
 			message.channelType = "C";
-			message.sender = message.channel; // Address the channel/group, not the user.
+			// message.sender = message.channel; // Address the channel/group, not the user.
 			message.formsOfAddress = new RegExp(`<?@?(forgetmenot|${botKeychain.bot_user_id})>?[,\s ]*`,'i');
 			break;
 		// it's either a private channel or multi-person DM
 		case "G":
 			message.channelType = "G";
-			message.sender = message.channel; // Address the channel/group, not the user.
+			// message.sender = message.channel; // Address the channel/group, not the user.
 			message.formsOfAddress = new RegExp(`<?@?(forgetmenot|${botKeychain.bot_user_id})>?[,\s ]*`,'i');
 			break;
 		// it's a DM with the user
 		case "D":
 			message.channelType = "D";
-			message.sender = message.user;
+			// message.sender = message.user;
 			message.formsOfAddress = new RegExp(``,'i'); // listen to all messages
 			break;
 	}
@@ -76,22 +76,19 @@ function scopeMessage(botKeychain, message) {
 	return message;
 }
 
-exports.transformMessage = function(botKeychain, message) {
+const transformMessage = function(botKeychain, message) {
 	// DMs have a slightly different format.
 	if(message.message) Object.assign(message, message.message)
 
 	message = scopeMessage(botKeychain, message);
 
-	// Respond only when the bot's involved
-	// But not if it's the bot posting.
-	// logger.log("Event heard", message)
-
-	if((message.text && !message.formsOfAddress.test(message.text)) || message.bot_id) return false;
+	message.sender = {
+		user: message.user,
+		channel: message.channel,
+		team: message.team
+	}
 
 	console.log("🔧🔧⚙️🔬 Transforming an API-able message: ", message)
-
-	// Approve it for API sending
-	message.usable = true;
 
 	// Remove reference to @forgetmenot
 	if(message.text) message.text = message.text.replace(message.formsOfAddress, '')
@@ -99,15 +96,32 @@ exports.transformMessage = function(botKeychain, message) {
 	return message;
 }
 
-exports.handleMessage = message => new Promise((resolve, reject) => {
-	logger.trace('handleMessage', message)
-	try {
-		rtm.sendTyping(message.channel);
-	} catch(e) {}
+exports.handleMessage = (botKeychain, message) => new Promise((resolve, reject) => {
+	logger.trace('handleMessage', botKeychain, message)
+
+	// * Transform the message so the bot replies to the right user/channel etc.
+	// * Get rid of unwanted addressing (e.g. @forgetmenot)
+	message = transformMessage(botKeychain, message)
+
+	// Respond only when the bot's involved
+	// But not if it's the bot posting.
+	// logger.log("Event heard", message)
+	if(message.type === 'desktop_notification' || (message.text && !message.formsOfAddress.test(message.text)) || message.bot_id) {
+		message.usable = false
+	} else {
+		message.usable = true
+	}
+	// Gendit bot post, ABORT
+	if(!message.usable) {
+		console.log('aborting!')
+		resolve(false)
+		return false
+	}
+	console.log('😈 CHATBOT listens to:', message)
 
 	// Transform into Facebook format.
 	var messagePackage = { entry: [ { messaging: [ {
-		sender: { id: message.channel },
+		sender: message.sender,
 		message: { },
 		platform: 'slack'
 	} ] } ] }
@@ -160,10 +174,8 @@ exports.handleMessage = message => new Promise((resolve, reject) => {
 		console.log("Packaged a file")
 	}
 
-	logger.log("TO API==>", JSON.stringify(messagePackage, null, 2))
+	logger.trace("TO API==>", JSON.stringify(messagePackage, null, 2))
 
-  logger.trace()
-  // logger.log(req)
   chatbotController.handleMessage(messagePackage)
   .then(function(apiResult) {
     logger.trace("FROM API==>", apiResult && apiResult.messageData ? JSON.stringify(apiResult.messageData, null, 2) : "No response text.")
@@ -177,17 +189,15 @@ exports.handleMessage = message => new Promise((resolve, reject) => {
 })
 
 function handleResponseGroup(response) {
+	logger.trace(handleResponseGroup, response)
   const d = Q.defer();
-  const promises = []
-  if (response && response.messageData) {
-    response.messageData.forEach(function(singleResponse) {
-			logger.trace(response)
-      promises.push(sendResponseAfterDelay(singleResponse.data, (singleResponse.delay || 0) * 1000))
-    })
-  }
-  Q.allSettled(promises)
+  const promises = response && response.messageData ? response.messageData.map(function(singleResponse) {
+		logger.trace(singleResponse.data)
+		return sendResponseAfterDelay(singleResponse.data, (singleResponse.delay || 0) * 1000)
+	}) : []
+  Promise.all(promises)
   .then(function(res) {
-    d.resolve(response.messageData)
+    d.resolve(res)
   }).catch(function(e) {
     logger.error(e)
     d.reject(e)
@@ -201,7 +211,7 @@ function sendResponseAfterDelay(thisResponse, delay) {
 
 	// For push-reminders where Chatbot specifies recipient.id
 	// Otherwise, look for `channel.id` and `channel` (the format for different Slack event types vary)
-	thisResponse.recipient = thisResponse.recipient.id || thisResponse.channel.id || thisResponse.channel;
+	// thisResponse.recipient = thisResponse.recipient.id || thisResponse.channel.id || thisResponse.channel;
 	// rtm.sendTyping(emitter.recipient)
 
 	var params = {
@@ -280,13 +290,14 @@ function sendResponseAfterDelay(thisResponse, delay) {
 	setTimeout(function() {
 		// if(params.attachments) console.log("Buttons should attach", params.attachments[0].actions)
 		const messageData = {
-			recipient: thisResponse.recipient,
+			recipient: thisResponse.recipient.platformSpecific.channel,
 			text: thisResponse.message.text,
 			params: params
 		}
+		logger.trace('messageData', messageData)
 		sendClientMessage(messageData)
 		.then(x => {
-			d.resolve("200 Emitted response",x)
+			d.resolve(messageData)
 		})
 		.catch(err => d.reject("ERROR Emitted response",err))
 	}, delay);

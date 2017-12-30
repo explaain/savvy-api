@@ -1,5 +1,5 @@
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'debug'})
+const logger = tracer.colorConsole({level: 'trace'})
 const sinon = require('sinon')
 const axios = require("axios");
 const Algolia = require('../controller/db_algolia')
@@ -7,7 +7,7 @@ const Algolia = require('../controller/db_algolia')
 if (process.env.NODE_ENV === "test") {
   const sandbox = sinon.sandbox.create()
   const testUser = {
-    'slack': 'D7EH3CKCL',
+    'slack': 'U04NVHJFD',
     'organisationID': 'explaain',
     'first': 'Jeremy',
     'last': 'Evans',
@@ -30,17 +30,26 @@ if (process.env.NODE_ENV === "test") {
 
 const AlgoliaUsers = new Algolia.Index(process.env.ALGOLIA_APP, process.env.ALGOLIA_ADMIN_API_KEY, process.env.ALGOLIA_USERS_INDEX)
 
-exports.getUserByPlatform = async function(platform, id) {
-  logger.trace('getUserByPlatform', platform, id)
+/**
+ * Takes sender data and returns User object from database
+ *
+ * @param  {Object} sender
+ * @param  {String} platform
+ * @return {Object}
+ */
+exports.getUserFromSender = async function(sender, platform) {
+  logger.trace('getUserFromSender', sender, platform)
+  const platformSpecificID = sender[{
+    slack: 'user',
+    default: 'uid'
+  }[platform || 'default']]
   const user = platform ? await AlgoliaUsers.getFirstFromSearch({
-    filters: platform + ': ' + id
-  }) : await AlgoliaUsers.getObject(id)
-  console.log(user);
+    filters: platform + ': ' + platformSpecificID
+  }) : await AlgoliaUsers.getObject(platformSpecificID)
   user.uid = user.objectID
-  if (user.uid === undefined) console.log('user!!!!!')
+  user.platformSpecific = sender
   // delete user.objectID
   delete user._highlightResult
-  console.log(user);
   return user
 }
 
