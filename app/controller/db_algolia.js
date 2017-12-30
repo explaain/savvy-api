@@ -2,9 +2,10 @@ const tracer = require('tracer')
 const logger = tracer.colorConsole({level: 'debug'})
 const AlgoliaSearch = require('algoliasearch')
 
-Index = class Index {
+const Index = class Index {
   constructor(appID, apiKey, indexID) {
     logger.trace('constructor', appID, apiKey, indexID)
+    const self = this
     const client = AlgoliaSearch(appID, apiKey, { protocol: 'https:' })
     this.AlgoliaIndex = client.initIndex(indexID)
   }
@@ -21,7 +22,8 @@ Index = class Index {
       })
     })
   }
-  searchObjects(apiKey, index, params) {
+  searchObjects(params) {
+    logger.trace('searchObjects', params)
     const self = this
     return new Promise((resolve, reject) => {
       self.AlgoliaIndex.search(params, (err, content) => {
@@ -29,10 +31,30 @@ Index = class Index {
           logger.error(err);
     			reject(err)
     		} else {
+          logger.trace(content)
           resolve(content)
     		}
     	})
     })
+  }
+  async getFirstFromSearch(params) {
+    logger.trace('getFirstFromSearch', params)
+    const self = this
+    const res = await self.searchObjects(params)
+    return res.hits[0]
+  }
+  async saveObject(user, object) {
+    logger.trace('saveObject', user, object)
+    const self = this
+    if (!object.objectID) delete object.objectID
+    const res = await new Promise((resolve, reject) => {
+      self.AlgoliaIndex.addObject(object, (err, content) => {
+    		if (err) reject(err)
+        else resolve(content)
+      })
+    })
+    object.objectID = res.objectID
+    return object
   }
   deleteObject(sender, organisationID, objectID) {
     // IS THIS SECURE? DOES IT DIFFERENTIATE BY SENDER????
@@ -57,9 +79,5 @@ exports.Index = Index
 exports.connect = (appID, apiKey, indexID) => {
   logger.trace('connect', appID, apiKey, indexID)
   const index = new Index(appID, apiKey, indexID)
-  return {
-    getObject: index.getObject,
-    searchObjects: index.searchObjects,
-    deleteObject: index.deleteObject,
-  }
+  return index
 }

@@ -47,31 +47,40 @@ const AlgoliaParams = {
 if (process.env.NODE_ENV === "test") {
   const sandbox = sinon.sandbox.create()
   sandbox.stub(track, 'event').returns()
-  sandbox.stub(Algolia, 'connect').returns({
-    getObject: () => {},
-    searchObjects: () => new Promise((resolve, reject) => {
-      resolve({
-        hits: [{
-          description: 'The Company Address is 123 Fake Street'
-        }]
-      })
-    }),
-    deleteObject: () => new Promise((resolve, reject) => { resolve() })
-  })
+  // sandbox.stub(Algolia, 'connect').returns({
+  //   getObject: () => {},
+  //   searchObjects: () => new Promise((resolve, reject) => {
+  //     resolve({
+  //       hits: [{
+  //         description: 'How often does Savvy index files?\n\n- Every 60 seconds'
+  //       }]
+  //     })
+  //   }),
+  //   getFirstFromSearch: () => new Promise((resolve, reject) => {
+  //     resolve({
+  //       description: 'How often does Savvy index files?\n\n- Every 60 seconds'
+  //     })
+  //   }),
+  //   saveObject: (user, object) => new Promise((resolve, reject) => {
+  //     if (!object.objectID) object.objectID = 12345
+  //     resolve(object)
+  //   }),
+  //   deleteObject: () => new Promise((resolve, reject) => { resolve() })
+  // })
   sandbox.stub(Firebase, 'save').resolves({
     data: {
       objectID: ''
     }
   })
-  // sandbox.stub(nlp, 'process').resolves({
-  //   source: 'agent',
-  //   resolvedQuery: 'What is the Company Address?',
-  //   parameters: { noun: [ 'Company', 'Address' ] },
-  //   contexts: [],
-  //   metadata: { intentName: 'query' },
-  //   score: 0.8600000143051147,
-  //   intent: 'query'
-  // })
+  sandbox.stub(nlp, 'process').callsFake((sender, query, contexts) => new Promise((resolve, reject) => {
+    resolve({
+      source: 'agent',
+      resolvedQuery: query,
+      contexts: [],
+      score: 0.8600000143051147,
+      intent: query == 'hi' ? 'greeting' : (query.indexOf('The ') === 0 ? 'storeMemory' : 'query')
+    })
+  }))
   sandbox.stub(uploader, 'upload').resolves('url_123')
   sandbox.stub(users, 'authenticateSender').resolves()
   sandbox.stub(users, 'checkPermissions').resolves()
@@ -115,7 +124,7 @@ const rescheduleAllReminders = function() {
 	};
   // Commented out for now as would need to search all indices!
 
-	// searchforCards(apiKey, AlgoliaIndex, searchParams)
+	// searchForCards(apiKey, AlgoliaIndex, searchParams)
 	// .then(function(content) {
 	// 	const reminders = content.hits
   //   logger.trace('--- Reminders Rescheduled: ---\n\n')
@@ -170,30 +179,27 @@ exports.deleteMemories = (sender, apiKey, organisationID, objectID) => new Promi
 
 exports.acceptRequest = async function(req) {
   try {
-    if (!req.content) req.content = { description: req.description || req.text || req.sentence }
+    if (!req.content) req.content = { description: req.description || req.content || req.text || req.sentence }
     if (!req.sender) req.sender = req.user ? req.user.uid : req.userID
     // req.verified allows platforms/slack.js to verify with a Slack-specific method - if we need to do Firebase-related stuff maybe we should check here too! But for that we'll need some sort of Firebase auth token (normally found only in browser?)...
-    if ((!req.user || !req.user.uid || !req.user.idToken) && req.platform) {
-      req.user = await getUserByPlatform(req.platform, req.sender)
+    if (!req.user || !req.user.uid || !req.user.idToken) {
+      req.user = await users.getUserByPlatform(req.platform, req.sender)
+      // req.sender = req.user.uid
     }
-    await users.authenticateSender(req.user)
-    await users.checkPermissions(req.organisationID, req.user)
+    if (req.platform !== 'slack' || !req.user.uid) {
+      await users.authenticateSender(req.user)
+      await users.checkPermissions(req.organisationID, req.user)
+    }
     const nlpData = await nlp.process(req.sender, req.content.description, req.contexts)
     req = combineObjects(req, nlpData)
     const result = await routeByIntent(req)
     if (!result.statusCode) result.statusCode = 200 //temp
+    logger.trace('Returning from API:', result)
     return result
   } catch (e) {
     console.error(e)
     return new Error(e)
   }
-}
-
-async function getUserByPlatform(platform, id) {
-  // const params = {
-  //
-  // }
-  // const user = await AlgoliaUsers.searchObjects()
 }
 
 exports.getUserData = function(req) {
@@ -300,12 +306,12 @@ const routeByIntent = function(requestData) {
 
 	switch(requestData.intent) {
 		case "nextResult":
-			tryAnotherMemory(sender);
+			tryAnotherMemory(requestData.sender);
 			break;
 
 		case "storeMemory":
       // logger.info(memory)
-			storeMemory(memory, requestData)
+			saveMemory(memory, requestData)
 			.then(function() {
 				d.resolve(data)
 			}).catch(function(e) {
@@ -318,7 +324,7 @@ const routeByIntent = function(requestData) {
 			try {
 				recallMemory(requestData)
 				.then(function(memories) {
-					logger.log(memories)
+					logger.trace(memories)
           if (memories.length == 0)
             logger.trace(404, 'No results found')
           data.memories = memories;
@@ -349,7 +355,7 @@ const routeByIntent = function(requestData) {
 					memory.actionSentence = getActionSentence2(memory.content.description, memory.context)
           logger.info(memory.actionSentence)
           data.memories = [memory]
-					storeMemory(memory, requestData)
+					saveMemory(memory, requestData)
 					.then(function() {
 						d.resolve(data)
 					}).catch(function(e) {
@@ -388,7 +394,7 @@ const routeByIntent = function(requestData) {
           memory.triggerDateTimeNumeric = getDateTimeNum(dateTimeOriginal, dateTimeMemory)
     			memory.triggerDateTime = new Date(memory.triggerDateTimeNumeric);
           data.memories = [memory]
-					storeMemory(memory, requestData)
+					saveMemory(memory, requestData)
 					.then(function() {
 						scheduleReminder(memory);
 						d.resolve(data)
@@ -441,7 +447,7 @@ const routeByIntent = function(requestData) {
 		// 		logger.error(e);
 		// 		d.reject(e)
 		// 	}
-		// 	storeMemory(memory)
+		// 	saveMemory(memory)
 		// 	.then(function() {
 		// 		d.resolve(data)
 		// 	}).catch(function(e) {
@@ -457,7 +463,7 @@ const routeByIntent = function(requestData) {
 			} else {
 				recallMemory(requestData)
 				.then(function(memories) {
-					logger.log(memories)
+					logger.trace(memories)
 					data.memories = memories;
 					d.resolve(data)
 				}).catch(function(e) {
@@ -474,22 +480,24 @@ const recallMemory = function(requestData) {
 	logger.trace(recallMemory, requestData)
 	const d = Q.defer()
 	const searchTerm = requestData.resolvedQuery;// memory.context.map(function(e){return e.value}).join(' ');
-	users.fetchUserData(requestData.sender)
+	users.fetchUserData(requestData.user.uid)
 	.then(function(userData) {
 		const readAccessList = userData.readAccess || []
     /* Temporarily allowing everything to search ACME userID */ readAccessList[readAccessList.length] = '101118387301286232222'
-		const userIdFilterString = 'userID: ' + requestData.sender + readAccessList.map(function(id) {return ' OR userID: '+id}).join('');
+		const userIdFilterString = 'userID: ' + requestData.user.uid + readAccessList.map(function(id) {return ' OR userID: '+id}).join('');
 		const searchParams = {
 			query: searchTerm.substring(0, 500), // Only sends Algolia the first 511 characters as it can't hanlogger.tracee more than that
-			filters: userIdFilterString,
+			// filters: userIdFilterString,
       hitsPerPage: 10,
 			// filters: (attachments ? 'hasAttachments: true' : '')
 		};
-    return searchforCards(requestData.senderApiKey, userData.organisationID, searchParams)
+    logger.trace(requestData, userData)
+    return searchForCards(requestData.user.algoliaApiKey, requestData.user.organisationID, searchParams)
 	}).then(function(content) {
 		if (!content.hits.length) {
       logger.trace('No results found')
     }
+    logger.trace('hits!', content.hits)
     d.resolve(content.hits)
     //  else {
 			// d.reject(404);
@@ -517,43 +525,44 @@ const recallMemory = function(requestData) {
 
 
 
-// Seems like this function is no longer necessary?
-const storeMemory = function(memory, requestData) {
-	logger.trace(storeMemory)
-	logger.trace(memory)
-	logger.trace(requestData)
-	const d = Q.defer()
-	try {
-    saveMemory(memory.sender, memory, requestData)
-    .then(function(memory) {
-      d.resolve(memory);
-    }).catch(function(e) {
-      logger.error(e);
-      d.reject(e);
-    });
-	} catch (e) {
-		logger.error(e);
-		giveUp(sender);
-	}
-	return d.promise
-}
+// // Seems like this function is no longer necessary?
+// const storeMemory = function(memory, requestData) {
+// 	logger.trace(storeMemory)
+// 	logger.trace(memory)
+// 	logger.trace(requestData)
+// 	const d = Q.defer()
+// 	try {
+//     saveMemory(requestData.user.uid, memory, requestData)
+//     .then(function(memory) {
+//       d.resolve(memory);
+//     }).catch(function(e) {
+//       logger.error(e);
+//       d.reject(e);
+//     });
+// 	} catch (e) {
+// 		logger.error(e);
+// 		giveUp(sender);
+// 	}
+// 	return d.promise
+// }
 
 
 
 
-const saveMemory = function(sender, m, requestData) {
+const saveMemory = function(m, requestData) {
 	logger.trace()
 	const d = Q.defer()
 	m.hasAttachments = !!(m.attachments) /* @TODO: investigate whether brackets are needed */
   // logger.info(m)
   var author
+  const uid = requestData.user.uid
   const memoryExists = !!m.objectID
-  users.fetchUserData(sender)
+  users.fetchUserData(uid)
   .then(function(res) {
     author = res
   //   return memoryExists ? getDbObject(AlgoliaIndex, m.objectID) : Q.fcall(function() {return null})
   // }).then(function(existingCard) {
-		m.userID = author ? author.uploadTo || sender : sender;
+		m.userID = author ? author.uploadTo || uid : uid;
   //   // if (author.teams) {
   //   //   if (!memoryExists) {
   //   //     m.teams = author.teams.map(function(team) {
@@ -578,15 +587,15 @@ const saveMemory = function(sender, m, requestData) {
 	// // 	return m.hasAttachments ? sendAttachmentUpload(sender, m.attachments[0].type, m.attachments[0].url) : Q.fcall(function() {return null});
   // }).then(function(results) {
 	// 	if (m.hasAttachments && results[0] && results[0].value.attachment_id) m.attachments[0].attachment_id = results[0].value.attachment_id;
-		return m.hasAttachments && m.attachments[0].type=="image" ? backupAttachment(sender, m.attachments[0].type, m.attachments[0].url) : Q.fcall(function() {return null});
+		return m.hasAttachments && m.attachments[0].type=="image" ? backupAttachment(uid, m.attachments[0].type, m.attachments[0].url) : Q.fcall(function() {return null});
 	}).then(function(url) {
 		if (m.hasAttachments && url) m.attachments[0].url = url;
-		if (memoryExists) {
-      // logger.info(m)
-			return updateDb(sender, m, requestData)
-		} else {
-			return saveToDb(sender, m, requestData)
-		}
+		// if (memoryExists) {
+    //   // logger.info(m)
+		// 	return updateDb(requestData.user, m, requestData)
+		// } else {
+			return saveToDb(requestData.user, m, requestData)
+		// }
 	}).then(function(m) {
 		d.resolve(m)
 	}).catch(function(e) {
@@ -597,11 +606,13 @@ const saveMemory = function(sender, m, requestData) {
 }
 
 
-const searchforCards = async function(apiKey, organisationID, params) {
+const searchForCards = async function(apiKey, organisationID, params) {
+  logger.trace(searchForCards, apiKey, organisationID, params)
   try {
     const index = organisationID + '__Cards'
     const content = await Algolia.connect(AlgoliaParams.appID, apiKey, index).searchObjects(params)
-    const itemCards = await fetchListItemCards(apiKey, index, content.hits) // What do we do with itemCards here?!
+    // const itemCards = await fetchListItemCards(apiKey, index, content.hits) // What do we do with itemCards here?!
+    logger.trace('Search Results:', content)
     return content
   } catch (e) {
     logger.error(e)
@@ -610,41 +621,30 @@ const searchforCards = async function(apiKey, organisationID, params) {
 }
 
 
-const saveToDb = function(sender, memory, requestData) {
-  /* Temporarily replacing all Slack userIDs with ACME userID */ if(memory.userID.length < 10) memory.userID = '101118387301286232222'
-  logger.trace(saveToDb, sender, memory, requestData)
+const saveToDb = function(user, card, requestData) {
+  /* Temporarily replacing all Slack userIDs with ACME userID */ if(card.userID.length < 10) card.userID = '101118387301286232222'
+  logger.trace(saveToDb, user, card, requestData)
 	const d = Q.defer();
-	memory.dateCreated = Date.now()
-  memory.dateUpdated = Date.now()
-	// AlgoliaIndex.addObject(memory, function(err, content){
-	// 	if (err) {
-	// 		// sendTextMessage(id, "I couldn't remember that");
-  //     logger.error(err);
-	// 		d.reject(err);
-	// 	} else {
-	// 		logger.trace('User memory created successfully!');
-	// 		memory.objectID = content.objectID
-	// 		d.resolve(memory);
-	// 	}
-	// });
+	card.dateCreated = Date.now()
 
   const data = {
-    organisationID: requestData.organisationID,
-    objectID: memory.objectID || null,
-    content: memory.content,
-    userID: requestData.user ? requestData.user.uid : requestData.sender
+    objectID: card.objectID || null,
+    description: card.description,
+    authorID: user.uid,
+    created: parseInt(new Date().getTime()/1000),
+    modified: parseInt(new Date().getTime()/1000)
   }
   logger.trace('💎  Here\'s the data:', data)
-  Firebase.save(data)
+  Algolia.connect(AlgoliaParams.appID, user.algoliaApiKey, user.organisationID + '__Cards').saveObject(user, data)
   .then(function(response) {
-    logger.trace('📪  The response data!', response.data)
-    memory.objectID = response.data.objectID
-    data.objectID = memory.objectID
+    logger.trace('📪  The response!', response)
+    if (!data.objectID) data.objectID = response.objectID
     track.event('Card Created', {
       organisationID: data.organisationID,
       userID: data.userID,
       card: data
     })
+		logger.trace('User card updated successfully!')
     d.resolve()
   }).catch(function(e) {
     console.log('📛  Error!', e);
@@ -652,43 +652,35 @@ const saveToDb = function(sender, memory, requestData) {
   })
 	return d.promise;
 }
-const updateDb = function(sender, memory, requestData) {
-  logger.trace(updateDb, sender, memory, requestData)
-  /* Temporarily replacing all Slack userIDs with ACME userID */ if(memory.userID.length < 10) memory.userID = '101118387301286232222'
-	const d = Q.defer();
-	memory.dateUpdated = Date.now()
-	// AlgoliaIndex.saveObject(memory, function(err, content){
-	// 	if (err) {
-	// 		logger.error(err);
-	// 		d.reject(err);
-	// 	} else {
-	// 		logger.trace('User memory updated successfully!');
-	// 		d.resolve(memory);
-	// 	}
-	// });
-
-  const data = {
-    organisationID: requestData.organisationID,
-    objectID: memory.objectID || null,
-    content: memory.content,
-    userID: requestData.user ? requestData.user.uid : requestData.sender
-  }
-  logger.trace('💎  Here\'s the data:', data)
-  Firebase.save(data)
-  .then(function(response) {
-    logger.trace('📪  The response data!', response.data);
-    track.event('Card Updated', {
-      organisationID: data.organisationID,
-      userID: data.userID,
-      card: data
-    })
-    d.resolve()
-  }).catch(function(e) {
-    console.log('📛  Error!', e);
-    d.reject()
-  })
-	return d.promise;
-}
+// const updateDb = function(user, memory, requestData) {
+//   logger.trace(updateDb, user, memory, requestData)
+//   /* Temporarily replacing all Slack userIDs with ACME userID */ if(memory.userID.length < 10) memory.userID = '101118387301286232222'
+// 	const d = Q.defer();
+// 	memory.dateUpdated = Date.now()
+//
+//   const data = {
+//     organisationID: user.organisationID,
+//     objectID: memory.objectID || null,
+//     content: memory.content,
+//     userID: user.uid
+//   }
+//   logger.trace('💎  Here\'s the data:', data)
+//   Algolia.connect(AlgoliaParams.appID, user.algoliaApiKey, user.organisationID + '__Cards').saveObject(user, data)
+//   .then(function(response) {
+//     logger.trace('📪  The response!', response);
+//     track.event('Card Updated', {
+//       organisationID: data.organisationID,
+//       userID: data.userID,
+//       card: data
+//     })
+//     logger.trace('User memory updated successfully!')
+//     d.resolve()
+//   }).catch(function(e) {
+//     console.log('📛  Error!', e);
+//     d.reject()
+//   })
+// 	return d.promise;
+// }
 
 exports.fetchUserDataFromDb = users.fetchUserDataFromDb;
 
@@ -774,7 +766,7 @@ const fetchListItemCards = function(apiKey, index, cards) {
       card.listCards = {}
       card.listItems.forEach(function(key) {
         const p = Q.defer()
-        Algolia.connect(AlgoliaParams.appID, apiKey, AlgoliaIndex).getObject(key)
+        Algolia.connect(AlgoliaParams.appID, apiKey, index).getObject(key)
         .then(function(content) {
           card.listCards[key] = content;
           p.resolve(content);
@@ -955,17 +947,19 @@ const getWrittenMemory = function(requestData) {
   var memory = requestData.parameters ? extractAllContext(requestData.parameters) : {}
   // logger.info('❇️ ❇️ ❇️ ' + requestData.intent)
   memory.intent = requestData.intent;
-  memory.sender = requestData.sender;
-  memory.content = requestData.content || {
-    description: rewriteSentence(requestData.resolvedQuery),
-    listItems: requestData.listItems,
-  }
-  memory.sentence = memory.content.description // Temporary until we update chrome extension
+  memory.author = requestData.user.uid;
+  // memory.content = requestData.content || {
+  //   description: rewriteSentence(requestData.resolvedQuery),
+  //   listItems: requestData.listItems,
+  // }
+  memory.description = rewriteSentence(requestData.resolvedQuery)
+  memory.listItems = requestData.listItems
+  memory.sentence = memory.description // Temporary until we update chrome extension
   memory.extractedFrom = requestData.extractedFrom
   memory.attachments = requestData.attachments;
   memory.triggerURL = requestData.triggerURL;
   if (requestData.objectID) memory.objectID = requestData.objectID;
-  // logger.info(memory);
+  logger.trace(memory);
   return memory
 }
 

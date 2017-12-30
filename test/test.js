@@ -14,6 +14,7 @@ const sinon = require('sinon');
 
 const api = require('../app/controller/api');
 const chatbot = require('../app/controller/chatbot');
+const slack = require('../app/platforms/slack');
 const properties = require('../app/config/properties.js');
 
 const tracer = require('tracer')
@@ -55,10 +56,9 @@ const sendRequest = function(apiFunction, data, results, done) {
   return d.promise
 }
 
-const sendApiRequest = function(sender, senderApiKey, message, results, done) {
+const sendApiRequest = function(sender, message, results, done) {
   const data = {
     sender: sender,
-    senderApiKey: senderApiKey,
     organisationID: 'explaain',
     text: message,
   }
@@ -67,8 +67,8 @@ const sendApiRequest = function(sender, senderApiKey, message, results, done) {
 }
 
 
-const sendApiDeleteRequest = function(sender, senderApiKey, objectID, results, done) {
-  api.deleteMemories(sender, senderApiKey, objectID)
+const sendApiDeleteRequest = function(sender, objectID, results, done) {
+  api.deleteMemories(sender, objectID)
   .then(function(body) {
     results.body = body
     logger.log(results)
@@ -80,7 +80,7 @@ const sendApiDeleteRequest = function(sender, senderApiKey, objectID, results, d
 }
 
 
-  const sendChatbotRequest = function(sender, senderApiKey, message, results, done) {
+  const sendChatbotRequest = function(sender, message, results, done) {
     const data = {
       entry: [
         {
@@ -102,7 +102,7 @@ const sendApiDeleteRequest = function(sender, senderApiKey, objectID, results, d
   }
 
 
-const sendChatbotQuickReply = function(sender, senderApiKey, code, results, done) {
+const sendChatbotQuickReply = function(sender, code, results, done) {
   const data = {
     entry: [
       {
@@ -125,7 +125,7 @@ const sendChatbotQuickReply = function(sender, senderApiKey, code, results, done
   return sendRequest(apiFunction, data, results, done)
 }
 
-const sendChatbotPostback = function(sender, senderApiKey, code, results, done) {
+const sendChatbotPostback = function(sender, code, results, done) {
   const data = {
     entry: [
       {
@@ -146,7 +146,7 @@ const sendChatbotPostback = function(sender, senderApiKey, code, results, done) 
   return sendRequest(apiFunction, data, results, done)
 }
 
-const sendChatbotAttachments = function(sender, senderApiKey, code, results, done) {
+const sendChatbotAttachments = function(sender, code, results, done) {
   const data = {
     entry: [
       {
@@ -191,8 +191,7 @@ const checkMemoryExistence = function(objectID) {
 
 describe('Bulk', function() {
   this.timeout(10000);
-  const sender = 1627888800569309;
-  const senderApiKey = '';
+  const sender = 'vZweCaZEWlZPx0gpQn2b1B7DFAZ2';
 
   describe('API', function() {
 
@@ -200,11 +199,11 @@ describe('Bulk', function() {
     describe('Sending the unlikely query "' + unlikelyQuery + '" which won\'t bring back any results', function() {
       const results = {};
       before(function(done) {
-        sendApiRequest(sender, senderApiKey, unlikelyQuery, results, done)
+        sendApiRequest(sender, unlikelyQuery, results, done)
       })
 
       it('should be interpreted as a "query" or "Default Fallback Intent"', function(done) {
-        assert(results.body.requestData.metadata.intentName == 'query' || results.body.requestData.metadata.intentName == 'Default Fallback Intent')
+        assert(results.body.requestData.intent == 'query' || results.body.requestData.intent == 'Default Fallback Intent')
         done()
       })
       it('should bring back no results', function(done) {
@@ -217,11 +216,11 @@ describe('Bulk', function() {
     describe('Sending the short message "' + shortMessage + '"', function() {
       const results = {};
       before(function(done) {
-        sendApiRequest(sender, senderApiKey, shortMessage, results, done)
+        sendApiRequest(sender, shortMessage, results, done)
       })
 
       it('should be interpreted as a "query" or "Default Fallback Intent"', function(done) {
-        assert(results.body.requestData.metadata.intentName == 'query' || results.body.requestData.metadata.intentName == 'Default Fallback Intent')
+        assert(results.body.requestData.intent == 'query' || results.body.requestData.intent == 'Default Fallback Intent')
         done()
       })
       it('should bring back a result with a "sentence" parameter', function(done) {
@@ -230,16 +229,16 @@ describe('Bulk', function() {
       })
     })
 
-    const queryMessage = 'What is the Company Address?'
+    const queryMessage = 'What\'s the company address?'
     const expectedQueryReturn = 'The Company Address is 123 Fake Street'
     describe('123 Sending the message "' + queryMessage + '"', function() {
       const results = {};
       before(function(done) {
-        sendApiRequest(sender, senderApiKey, queryMessage, results, done)
+        sendApiRequest(sender, queryMessage, results, done)
       });
 
       it('should be interpreted as a "query"', function(done) {
-        assert.equal(results.body.requestData.metadata.intentName, 'query')
+        assert.equal(results.body.requestData.intent, 'query')
         done()
       })
       it('should bring back a result with the "sentence" parameter "' + expectedQueryReturn + '"', function(done) {
@@ -253,11 +252,11 @@ describe('Bulk', function() {
     describe('Sending the message "' + message + '"', function() {
       const results = {};
       before(function(done) {
-        sendApiRequest(sender, senderApiKey, message, results, done)
+        sendApiRequest(sender, message, results, done)
       });
 
       it('should be interpreted as a "storeMemory"', function(done) {
-        assert.equal(results.body.requestData.metadata.intentName, 'storeMemory')
+        assert.equal(results.body.requestData.intent, 'storeMemory')
         done()
       })
       it('should bring back a result with the "sentence" parameter "' + expectedReturn + '"', function(done) {
@@ -274,11 +273,11 @@ describe('Bulk', function() {
 
         const results = {};
         before(function(done) {
-          sendApiRequest(sender, senderApiKey, message2, results, done)
+          sendApiRequest(sender, message2, results, done)
         });
 
         it('should be interpreted as a ' + expectedIntent, function(done) {
-          assert.equal(results.body.requestData.metadata.intentName, expectedIntent)
+          assert.equal(results.body.requestData.intent, expectedIntent)
           done()
         })
         it('should bring back a result with a "triggerDateTime" parameter', function(done) {
@@ -295,11 +294,11 @@ describe('Bulk', function() {
 
         const results = {};
         before(function(done) {
-          sendApiRequest(sender, senderApiKey, message2a, results, done)
+          sendApiRequest(sender, message2a, results, done)
         });
 
         it('should be interpreted as a ' + expectedIntent, function(done) {
-          assert.equal(results.body.requestData.metadata.intentName, expectedIntent)
+          assert.equal(results.body.requestData.intent, expectedIntent)
           done()
         })
         it('should bring back a result with a "triggerDateTime" parameter', function(done) {
@@ -322,11 +321,11 @@ describe('Bulk', function() {
 
         const results = {};
         before(function(done) {
-          sendApiRequest(sender, senderApiKey, message3, results, done)
+          sendApiRequest(sender, message3, results, done)
         });
 
         it('should be interpreted as a ' + expectedIntent, function(done) {
-          assert.equal(results.body.requestData.metadata.intentName, expectedIntent)
+          assert.equal(results.body.requestData.intent, expectedIntent)
           done()
         })
         it('should bring back a result with a "triggerDateTime" parameter', function(done) {
@@ -349,11 +348,11 @@ describe('Bulk', function() {
 
         const results = {};
         before(function(done) {
-          sendApiRequest(sender, senderApiKey, message4, results, done)
+          sendApiRequest(sender, message4, results, done)
         });
 
         it('should be interpreted as a ' + expectedIntent, function(done) {
-          assert.equal(results.body.requestData.metadata.intentName, expectedIntent)
+          assert.equal(results.body.requestData.intent, expectedIntent)
           done()
         })
         it('should bring back a result with a "triggerDateTime" parameter', function(done) {
@@ -376,11 +375,11 @@ describe('Bulk', function() {
 
         const results = {};
         before(function(done) {
-          sendApiRequest(sender, senderApiKey, message5, results, done)
+          sendApiRequest(sender, message5, results, done)
         });
 
         it('should be interpreted as a ' + expectedIntent, function(done) {
-          assert.equal(results.body.requestData.metadata.intentName, expectedIntent)
+          assert.equal(results.body.requestData.intent, expectedIntent)
           done()
         })
         it('should bring back a result with a "triggerDateTime" parameter', function(done) {
@@ -403,11 +402,11 @@ describe('Bulk', function() {
 
         const results = {};
         before(function(done) {
-          sendApiRequest(sender, senderApiKey, message6, results, done)
+          sendApiRequest(sender, message6, results, done)
         });
 
         it('should be interpreted as a ' + expectedIntent, function(done) {
-          assert.equal(results.body.requestData.metadata.intentName, expectedIntent)
+          assert.equal(results.body.requestData.intent, expectedIntent)
           done()
         })
         it('should bring back a result with a "triggerDateTime" parameter', function(done) {
@@ -430,11 +429,11 @@ describe('Bulk', function() {
 
         const results = {};
         before(function(done) {
-          sendApiRequest(sender, senderApiKey, message7, results, done)
+          sendApiRequest(sender, message7, results, done)
         });
 
         it('should be interpreted as a ' + expectedIntent, function(done) {
-          assert.equal(results.body.requestData.metadata.intentName, expectedIntent)
+          assert.equal(results.body.requestData.intent, expectedIntent)
           done()
         })
         it('should bring back a result with a "triggerDateTime" parameter', function(done) {
@@ -461,11 +460,11 @@ describe('Bulk', function() {
 
         const results = {};
         before(function(done) {
-          sendApiRequest(sender, senderApiKey, message5, results, done)
+          sendApiRequest(sender, message5, results, done)
         });
 
         it('should be interpreted as a ' + expectedIntent, function(done) {
-          assert.equal(results.body.requestData.metadata.intentName, expectedIntent)
+          assert.equal(results.body.requestData.intent, expectedIntent)
           done()
         })
         it('should bring back a result with the "triggerURL" parameter "' + expectedURL + '"', function(done) {
@@ -495,11 +494,11 @@ describe('Bulk', function() {
 
       const results = {};
       before(function(done) {
-        sendChatbotRequest(sender, senderApiKey, unlikelyQuery, results, done)
+        sendChatbotRequest(sender, unlikelyQuery, results, done)
       })
 
       it('should be interpreted as a "query" or "Default Fallback Intent"', function(done) {
-        assert(results.body.requestData.metadata.intentName == 'query' || results.body.requestData.metadata.intentName == 'Default Fallback Intent')
+        assert(results.body.requestData.intent == 'query' || results.body.requestData.intent == 'Default Fallback Intent')
         done()
       })
       it('should bring back no results', function(done) {
@@ -516,11 +515,11 @@ describe('Bulk', function() {
     describe('Sending the greeting "' + greeting + '"', function() {
       const results = {};
       before(function(done) {
-        sendChatbotRequest(sender, senderApiKey, greeting, results, done)
+        sendChatbotRequest(sender, greeting, results, done)
       })
 
       it('should be interpreted as a "greeting"', function(done) {
-        assert(results.body.requestData.metadata.intentName == 'greeting')
+        assert(results.body.requestData.intent == 'greeting')
         done()
       })
       it('should return a message', function(done) {
@@ -533,7 +532,7 @@ describe('Bulk', function() {
     describe('Sending the chatbot1 short message "' + shortMessage + '"', function() {
       const results = {};
       before(function(done) {
-        sendChatbotRequest(sender, senderApiKey, shortMessage, results, done)
+        sendChatbotRequest(sender, shortMessage, results, done)
       })
 
       it('should return a message', function(done) {
@@ -552,7 +551,7 @@ describe('Bulk', function() {
 
       const results = {};
       before(function(done) {
-        sendChatbotRequest(sender, senderApiKey, message1, results, done)
+        sendChatbotRequest(sender, message1, results, done)
       });
 
       it('should be say it\s remembered it for you', function(done) {
@@ -568,11 +567,11 @@ describe('Bulk', function() {
 
       const results = {};
       before(function(done) {
-        sendChatbotRequest(sender, senderApiKey, message2, results, done)
+        sendChatbotRequest(sender, message2, results, done)
       });
 
       it('should be interpreted as a ' + expectedIntent, function(done) {
-        assert.equal(results.body.requestData.metadata.intentName, expectedIntent)
+        assert.equal(results.body.requestData.intent, expectedIntent)
         done()
       })
       it('should bring back a result with a "triggerDateTime" parameter', function(done) {
@@ -636,7 +635,7 @@ describe('Bulk', function() {
           const results = {}
           if (test.weight > 2) {
             before(function(done) {
-              sendChatbotRequest(localSender, senderApiKey, test.sentence, results, done)
+              sendChatbotRequest(localSender, test.sentence, results, done)
             });
             it('"' + test.actionSentence + '"', function(done) {
               const aS = results.body.memories[0].actionSentence
@@ -713,7 +712,7 @@ describe('Bulk', function() {
           const results = {}
           if (test.weight > 2) {
             before(function(done) {
-              sendChatbotRequest(localSender, senderApiKey, test.sentence, results, done)
+              sendChatbotRequest(localSender, test.sentence, results, done)
             });
             it('should have intent "setTask.URL"', function(done) {
               assert.equal(results.body.requestData.intent, 'setTask.URL')
@@ -768,10 +767,10 @@ describe('Bulk', function() {
 
           before(function() {
             const d = Q.defer()
-            sendChatbotRequest(sender, senderApiKey, message1)
+            sendChatbotRequest(sender, message1)
             .then(function(res) {
               resultList.push(res)
-              sendChatbotQuickReply(sender, senderApiKey, code1)
+              sendChatbotQuickReply(sender, code1)
               .then(function(res1) {
                 resultList.push(res1)
                 d.resolve()
@@ -799,7 +798,7 @@ describe('Bulk', function() {
 
           before(function() {
             const d = Q.defer()
-            sendChatbotQuickReply(sender, senderApiKey, code2)
+            sendChatbotQuickReply(sender, code2)
             .then(function(res) {
               resultList.push(res)
               d.resolve()
@@ -821,10 +820,10 @@ describe('Bulk', function() {
 
           before(function() {
             const d = Q.defer()
-            sendChatbotQuickReply(sender, senderApiKey, code1)
+            sendChatbotQuickReply(sender, code1)
             .then(function(res) {
               resultList.push(res)
-              sendChatbotQuickReply(sender, senderApiKey, code3)
+              sendChatbotQuickReply(sender, code3)
               .then(function(res1) {
                 resultList.push(res1)
                 d.resolve()
@@ -849,7 +848,7 @@ describe('Bulk', function() {
 
           before(function() {
             const d = Q.defer()
-            sendChatbotAttachments(sender, senderApiKey, attachment1, 'image')
+            sendChatbotAttachments(sender, attachment1, 'image')
             .then(function(res) {
               resultList.push(res)
               d.resolve()
@@ -872,7 +871,7 @@ describe('Bulk', function() {
 
           before(function() {
             const d = Q.defer()
-            sendChatbotQuickReply(sender, senderApiKey, code5)
+            sendChatbotQuickReply(sender, code5)
             .then(function(res) {
               resultList.push(res)
               d.resolve()
@@ -897,10 +896,10 @@ describe('Bulk', function() {
           before(function() {
             const d = Q.defer()
             // setTimeout(function() {
-              sendChatbotQuickReply(sender, senderApiKey, code1b)
+              sendChatbotQuickReply(sender, code1b)
               .then(function(res) {
                 resultList.push(res)
-                sendChatbotQuickReply(sender, senderApiKey, code6)
+                sendChatbotQuickReply(sender, code6)
                 .then(function(res1) {
                   resultList.push(res1)
                   d.resolve()
@@ -924,7 +923,7 @@ describe('Bulk', function() {
             // }
           )
           it('should be interpreted as a "query" or "Default Fallback Intent"', function(done) {
-            assert(resultList[resultList.length-1].requestData.metadata.intentName == 'query' || resultList[resultList.length-1].requestData.metadata.intentName == 'Default Fallback Intent')
+            assert(resultList[resultList.length-1].requestData.intent == 'query' || resultList[resultList.length-1].requestData.intent == 'Default Fallback Intent')
             done()
           })
         })
@@ -935,10 +934,10 @@ describe('Bulk', function() {
 
           before(function() {
             const d = Q.defer()
-            sendChatbotQuickReply(sender, senderApiKey, code1b)
+            sendChatbotQuickReply(sender, code1b)
             .then(function(res) {
               resultList.push(res)
-              sendChatbotQuickReply(sender, senderApiKey, code7)
+              sendChatbotQuickReply(sender, code7)
               .then(function(res1) {
                 resultList.push(res1)
                 d.resolve()
@@ -967,7 +966,7 @@ describe('Bulk', function() {
 
           before(function() {
             const d = Q.defer()
-            sendChatbotPostback(sender, senderApiKey, code8)
+            sendChatbotPostback(sender, code8)
             .then(function(res) {
               resultList.push(res)
               d.resolve()
@@ -993,7 +992,7 @@ describe('Bulk', function() {
 
           before(function() {
             const d = Q.defer()
-            sendChatbotAttachments(sender, senderApiKey, attachment1, 'image')
+            sendChatbotAttachments(sender, attachment1, 'image')
             .then(function(res) {
               resultList.push(res)
               d.resolve()
@@ -1015,7 +1014,7 @@ describe('Bulk', function() {
 
           before(function() {
             const d = Q.defer()
-            sendChatbotQuickReply(sender, senderApiKey, code1)
+            sendChatbotQuickReply(sender, code1)
             .then(function(res) {
               resultList.push(res)
               d.resolve()
@@ -1038,7 +1037,7 @@ describe('Bulk', function() {
 
           before(function() {
             const d = Q.defer()
-            sendChatbotRequest(sender, senderApiKey, message1)
+            sendChatbotRequest(sender, message1)
             .then(function(res) {
               resultList.push(res)
               d.resolve()
@@ -1080,7 +1079,7 @@ describe('Bulk', function() {
 
           before(function() {
             const d = Q.defer()
-            sendChatbotRequest(sender, senderApiKey, message1)
+            sendChatbotRequest(sender, message1)
             .then(function(res) {
               resultList.push(res)
               d.resolve()
@@ -1091,7 +1090,7 @@ describe('Bulk', function() {
           });
 
           it('should be interpreted as a ' + expectedIntent, function(done) {
-            assert.equal(resultList[resultList.length-1].requestData.metadata.intentName, expectedIntent)
+            assert.equal(resultList[resultList.length-1].requestData.intent, expectedIntent)
             done()
           })
           it('should bring back quick reply options', function(done) {
@@ -1107,7 +1106,7 @@ describe('Bulk', function() {
 
           before(function() {
             const d = Q.defer()
-            sendChatbotQuickReply(sender, senderApiKey, code1)
+            sendChatbotQuickReply(sender, code1)
             .then(function(res) {
               resultList.push(res)
               d.resolve()
@@ -1130,7 +1129,7 @@ describe('Bulk', function() {
 
           before(function() {
             const d = Q.defer()
-            sendChatbotRequest(sender, senderApiKey, message2)
+            sendChatbotRequest(sender, message2)
             .then(function(res) {
               resultList.push(res)
               d.resolve()
@@ -1141,7 +1140,7 @@ describe('Bulk', function() {
           });
 
           it('should be interpreted as a ' + expectedIntent, function(done) {
-            assert.equal(resultList[resultList.length-1].requestData.metadata.intentName, expectedIntent)
+            assert.equal(resultList[resultList.length-1].requestData.intent, expectedIntent)
             done()
           })
           it('should bring back a result with a "triggerDateTime" parameter', function(done) {
@@ -1172,7 +1171,7 @@ describe('Bulk', function() {
 
         before(function() {
           const d = Q.defer()
-          sendChatbotRequest(sender, senderApiKey, message1)
+          sendChatbotRequest(sender, message1)
           .then(function(res) {
             resultList.push(res)
             d.resolve()
@@ -1183,7 +1182,7 @@ describe('Bulk', function() {
         });
 
         it('should be interpreted as one of ' + expectedIntents.join(' or '), function(done) {
-          assert(expectedIntents.indexOf(resultList[resultList.length-1].requestData.metadata.intentName) > -1)
+          assert(expectedIntents.indexOf(resultList[resultList.length-1].requestData.intent) > -1)
           done()
         })
         it('should bring back quick reply options', function(done) {
@@ -1199,7 +1198,7 @@ describe('Bulk', function() {
 
         before(function() {
           const d = Q.defer()
-          sendChatbotQuickReply(sender, senderApiKey, code1)
+          sendChatbotQuickReply(sender, code1)
           .then(function(res) {
             resultList.push(res)
             d.resolve()
@@ -1222,7 +1221,7 @@ describe('Bulk', function() {
 
         before(function() {
           const d = Q.defer()
-          sendChatbotRequest(sender, senderApiKey, message2)
+          sendChatbotRequest(sender, message2)
           .then(function(res) {
             resultList.push(res)
             d.resolve()
@@ -1234,7 +1233,7 @@ describe('Bulk', function() {
 
         it('should be interpreted as a ' + expectedIntent
           , function(done) {
-            assert.equal(resultList[resultList.length-1].requestData.metadata.intentName, expectedIntent)
+            assert.equal(resultList[resultList.length-1].requestData.intent, expectedIntent)
             done()
           }
         )
@@ -1278,6 +1277,70 @@ describe('Bulk', function() {
     })
     describe('Set a URL-based reminder', function() {
       it('should store the memory')
+    })
+  })
+
+  describe('Slack', function() {
+    const messageTemplate = { type: 'message',
+      channel: 'D7EH3CKCL',
+      user: 'U04NVHJFD',
+      ts: '1514506085.000191',
+      source_team: 'T04NVHJBK',
+      team: 'T04NVHJBK',
+      channelType: 'D',
+      sender: 'U04NVHJFD',
+      formsOfAddress: /(?:)/i,
+      usable: true
+    }
+    const sendTextMessage = async text => {
+      const message = JSON.parse(JSON.stringify(messageTemplate))
+      message.text = text
+      return await slack.handleMessage(message)
+    }
+    describe('Say hello', function() {
+      var result
+      before(async () => {
+        result = await sendTextMessage('hi')
+        return
+      })
+      it('should return to the correct recipient', () => {
+        assert.equal(result[0].data.recipient, messageTemplate.channel)
+      })
+      it('should return a text message', () => {
+        console.log(result[0].data.message.text)
+        assert(result[0].data.message.text)
+      })
+      it('should return a greeting', () => {
+        assert(['Hello there!', 'Nice to see you', 'Hi 😊', 'Hello 🙂'].indexOf(result[0].data.message.text) > -1)
+      })
+    })
+    describe('Ask how often Savvy indexes files', function() {
+      var result
+      before(async () => {
+        result = await sendTextMessage('How often does Savvy index files?')
+        return
+      })
+      it('should return a text message', () => {
+        console.log(result[0].data.message.text)
+        assert(result[0].data.message.text)
+      })
+      it('should return the answer', () => {
+        assert.equal(result[0].data.message.text, 'How often does Savvy index files?\n\n- Every 60 seconds')
+      })
+    })
+    describe('Store the company address', function() {
+      var result
+      before(async () => {
+        result = await sendTextMessage('The company address is 123 Fake Street')
+        return
+      })
+      it('should return a text message', () => {
+        console.log(result[0].data.message.text)
+        assert(result[0].data.message.text)
+      })
+      it('should return confirmation', () => {
+        assert.equal(result[0].data.message.text, 'I\'ve now remembered that for you! The company address is 123 Fake Street')
+      })
     })
   })
 

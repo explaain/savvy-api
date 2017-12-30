@@ -204,8 +204,10 @@ exports.handleMessage = function(body) {
 			}
 			firstPromise
 			.then(function(res) {
+				logger.trace('res:', res)
 				const responseMessage = res ? getResponseMessage(res) : null
 				logger.trace('responseMessage:', responseMessage)
+				logger.trace('responseMessage first message data:', responseMessage.messageData[0].data)
 				if (res && res.memories) { //Not sure if this is the right condition?
 					setContext(sender, 'lastAction', res)
 				}
@@ -727,7 +729,7 @@ function intentConfidence(sender, message, extraData) {
 }
 
 const getResponseMessage = function(data) {
-	logger.trace();
+	logger.trace(getResponseMessage, data)
 	const sender = data.requestData.sender
 	var m = data.memories ? data.memories[0] : null
 	var intent = data.requestData.intent
@@ -736,7 +738,9 @@ const getResponseMessage = function(data) {
 	var followUp = null
 	switch (data.statusCode) {
 		case 200:
-			logger.trace()
+			logger.trace('m', m)
+			if (m && !m.sentence) m.sentence = m.description || m.content
+			logger.trace('m', m)
 
 			switch (intent) {
 				case 'query':
@@ -871,12 +875,13 @@ const getCarousel = function(sender, memories) {
 function prepareResult(sender, memory) {
 	logger.trace(prepareResult);
 	var sentence = memory.resultSentence || memory.sentence;
-	if (memory.listItems) {
-		sentence += '\n\n' + memory.listItems.map(function(key) {
-			const card = memory.listCards[key]
-			const text = card.sentence
-			return getEmojis(text, card.entities, 1, true) + ' ' + text
-		}).join('\n')
+	if (memory.listCards) {
+		sentence += '\n\n- ' + memory.listCards.join('\n- ')
+		// sentence += '\n\n' + memory.listItems.map(function(key) {
+		// 	const card = memory.listCards[key]
+		// 	const text = card.sentence
+		// 	return getEmojis(text, card.entities, 1, true) + ' ' + text
+		// }).join('\n')
 	}
 	if (memory.attachments) {
 		if (~[".","!","?",";"].indexOf(sentence[sentence.length-1])) sentence = sentence.substring(0, sentence.length - 1);;
