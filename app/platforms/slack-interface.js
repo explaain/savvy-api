@@ -86,6 +86,13 @@ exports.quickreply = function(req, res) {
   return slack.quickreply(reaction)
 }
 
+
+exports.events = function(req, res) {
+	logger.trace('exports.events', req.body)
+
+  res.send({challenge: req.body.challenge})
+}
+
 // Dev bootstrap
 initateSlackBot({
 	bot_access_token: process.env.SLACK_BOT_USER_OAUTH_ACCESS_TOKEN,
