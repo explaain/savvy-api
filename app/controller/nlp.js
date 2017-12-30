@@ -14,7 +14,7 @@ exports.process = (sender, text, contexts) => new Promise(function(resolve, reje
       query: messageToApiai,
       timezone: 'GMT+1',
       lang: 'en',
-      sessionId: sender,
+      sessionId: sender.uid,
       contexts: contexts
     })
     const options = {
@@ -38,7 +38,7 @@ exports.process = (sender, text, contexts) => new Promise(function(resolve, reje
         // reject(error)
         // Need to handle this properly
         result = {
-          intent: 'storeMemory',
+          intent: 'query',
           resolvedQuery: text,
         }
         resolve(result)
