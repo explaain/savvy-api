@@ -124,6 +124,9 @@ exports.handleMessage = function(body) {
 				consecutiveFails: 0,
 				totalFailCount: 0
 			}
+			console.log(event)
+			const context = event.context || {}
+			if (event.platform) context.platform = event.platform
 			setContext(sender, 'failing', false);
 			var firstPromise;
 			try {
@@ -177,7 +180,7 @@ exports.handleMessage = function(body) {
 						default: {
 							var result = {}
 							const extraData = event.message.attachments ? { attachments: event.message.attachments } : null
-							firstPromise = intentConfidence(sender, text, { platform: event.platform })
+							firstPromise = intentConfidence(sender, text, context)
 							setContext(sender, 'apiaiContexts', null) // Maybe don't always want to delete this straight away?
 						}
 					}

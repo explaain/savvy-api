@@ -1,10 +1,11 @@
-const chatbotController = require('../controller/chatbot')
-
-const properties = require('../config/properties.js')
 const schedule = require('node-schedule')
 const chrono = require('chrono-node')
 const crypto = require("crypto")
 const Q = require("q")
+const sinon = require('sinon')
+
+const chatbotController = require('../controller/chatbot')
+const properties = require('../config/properties.js')
 
 const tracer = require('tracer')
 const logger = tracer.colorConsole({level: 'trace'})
@@ -12,32 +13,48 @@ const logger = tracer.colorConsole({level: 'trace'})
 // const logger = debug ? tracer.colorConsole({level: 'log'}) : {trace:()=>{},log:()=>{}}
 // tracer.setLevel('error')
 
+const handedDown = { clientMessageFunction: () => new Promise(function(resolve, reject) { resolve() }) }
+
+if (process.env.NODE_ENV === "test") {
+  const sandbox = sinon.sandbox.create()
+  sandbox.stub(handedDown, 'clientMessageFunction').resolves({
+		type: 'message',
+		channel: 'C7BQBL138',
+		user: 'U04NVHJFD',
+		text: 'testing testing',
+		ts: '1514745075.000017',
+		source_team: 'T04NVHJBK',
+		team: 'T04NVHJBK'
+	})
+}
+
+
 var bot;
 
-
-var clientMessageFunction = () => new Promise(function(resolve, reject) { resolve() })
 exports.acceptClientMessageFunction = function(messageFunction) {
-	clientMessageFunction = messageFunction
+	console.log(123);
+	handedDown.clientMessageFunction = messageFunction
 }
 
 // For sending standalone messages
-const sendClientMessage = function(data) {
-	const d = Q.defer()
-	if (clientMessageFunction) {
-		clientMessageFunction(data)
+const sendClientMessage = (data) => new Promise(function(resolve, reject) {
+	console.log(1)
+	if (handedDown.clientMessageFunction) {
+		console.log(2)
+		handedDown.clientMessageFunction(data)
 		.then(function(res) {
-			d.resolve(res)
+			console.log(3)
+			resolve(res)
 		}).catch(function(e) {
 			logger.error(e)
-			d.reject(e)
+			reject(e)
 		})
 	} else {
 		const e = 'No clientMessageFunction defined'
 		logger.error(e)
-		d.reject(e)
+		reject(e)
 	}
-	return d.promise
-}
+})
 
 chatbotController.acceptClientMessageFunction((response) => {
 	const d = Q.defer()
@@ -51,19 +68,19 @@ chatbotController.acceptClientMessageFunction((response) => {
 	return d.promise
 })
 
-function scopeMessage(botKeychain, message) {
-	switch (message.channel.charAt(0)) {
+function scopeMessage(botUserID, message) {
+	switch (message.sender.channel.charAt(0)) {
 		// it's a public channel
 		case "C":
 			message.channelType = "C";
 			// message.sender = message.channel; // Address the channel/group, not the user.
-			message.formsOfAddress = new RegExp(`<?@?(forgetmenot|${botKeychain.bot_user_id})>?[,\s ]*`,'i');
+			message.formsOfAddress = new RegExp(`<?@?(forgetmenot|${botUserID})>?[,\s ]*`,'i');
 			break;
 		// it's either a private channel or multi-person DM
 		case "G":
 			message.channelType = "G";
 			// message.sender = message.channel; // Address the channel/group, not the user.
-			message.formsOfAddress = new RegExp(`<?@?(forgetmenot|${botKeychain.bot_user_id})>?[,\s ]*`,'i');
+			message.formsOfAddress = new RegExp(`<?@?(forgetmenot|${botUserID})>?[,\s ]*`,'i');
 			break;
 		// it's a DM with the user
 		case "D":
@@ -72,50 +89,88 @@ function scopeMessage(botKeychain, message) {
 			message.formsOfAddress = new RegExp(``,'i'); // listen to all messages
 			break;
 	}
-
+console.log(message);
 	return message;
 }
 
-const transformMessage = function(botKeychain, message) {
+const transformMessage = function(teamInfo, message) {
 	// DMs have a slightly different format.
 	if(message.message) Object.assign(message, message.message)
 
-	message = scopeMessage(botKeychain, message);
-
 	message.sender = {
 		user: message.user,
-		channel: message.channel,
-		team: message.team
+		channel: message.channel || (message.item ? message.item.channel : ''),
+		team: message.team || teamInfo.teamID
 	}
+
+	message = scopeMessage(teamInfo.botUserID, message);
 
 	console.log("🔧🔧⚙️🔬 Transforming an API-able message: ", message)
 
-	return message;
+	return message
 }
 
-exports.handleMessage = (botKeychain, message) => new Promise((resolve, reject) => {
-	logger.trace('handleMessage', botKeychain, message)
+exports.handleMessage = (teamInfo, message) => {
+	logger.trace('handleMessage', teamInfo, message)
 
 	// * Transform the message so the bot replies to the right user/channel etc.
 	// * Get rid of unwanted addressing (e.g. @forgetmenot)
-	message = transformMessage(botKeychain, message)
+	message = transformMessage(teamInfo, message)
 
-	// Respond only when the bot's involved
-	// But not if it's the bot posting.
-	// logger.log("Event heard", message)
-	message.usable = (message.type !== 'desktop_notification' && (!message.text || message.formsOfAddress.test(message.text)) && !message.bot_id)
-
-	// Gendit bot post, ABORT
-	if(!message.usable) {
-		console.log('aborting!')
-		resolve(false)
-		return false
+	switch (message.type) {
+		case 'message':
+			// Respond only when the bot's involved
+			// But not if it's the bot posting.
+ 			if ((!message.text || message.formsOfAddress.test(message.text)) && !message.bot_id)
+				return messageReceived(message)
+		case 'quick_reply': // ???
+			// ???
+			break
+		case 'reaction_added':
+			if (message.reaction === 'rocket')
+				return reactionAdded(teamInfo, message)
+		default:
+			console.log('aborting!')
+			return new Promise((resolve, reject) => { resolve() })
 	}
-	console.log('😈 CHATBOT listens to:', message)
+}
 
+const setTyping = message => sendClientMessage({
+		action: 'setTyping',
+		data: {
+			team: message.team,
+			channel: message.channel,
+			on: true
+		}
+	})
+
+const messageReceived = message => {
+	console.log('😈 CHATBOT listens to:', message)
+	setTyping(message)
 	// Remove reference to @forgetmenot
 	if(message.text) message.text = message.text.replace(message.formsOfAddress, '')
+	return packageAndHandleMessage(message)
+}
 
+const reactionAdded = async (teamInfo, message) => {
+	// Get message ID
+	const messageID = message.item.ts
+	// Get message data
+	const messageSpecs = {
+		team: teamInfo.team, // @TODO: Sort this out so it's not hard-coded!!
+		channel: message.item.channel,
+		ts: message.item.ts
+	}
+	var messageData = await getMessageBySpecs(messageSpecs)
+	messageData = transformMessage(teamInfo, messageData)
+	logger.trace('messageData now transformed', messageData)
+	// Save message to database
+	const context = { intent: 'storeMemory' }
+	return await packageAndHandleMessage(messageData, context)
+}
+
+const packageAndHandleMessage = (message, context) => new Promise((resolve, reject) => {
+	logger.trace(packageAndHandleMessage, message, context)
 	// Transform into Facebook format.
 	var messagePackage = { entry: [ { messaging: [ {
 		sender: message.sender,
@@ -135,6 +190,8 @@ exports.handleMessage = (botKeychain, message) => new Promise((resolve, reject) 
 		}
 	}
 
+	messagePackage.entry[0].messaging[0].context = context
+
 	// Package it up, add it to the messages for API to figure out.
 	if(message.file) {
 
@@ -152,6 +209,7 @@ exports.handleMessage = (botKeychain, message) => new Promise((resolve, reject) 
 				url: message.file.permalink
 			}
 		}]
+
 
 		// // NB: this is packaged as the second in a two-part message array.
 		// // TODO: Have chatbot **automatically** treat this message[1]
@@ -181,7 +239,8 @@ exports.handleMessage = (botKeychain, message) => new Promise((resolve, reject) 
 		resolve(res)
 	})
 	.catch(function(e) {
-    logger.error(e);
+    logger.error(e)
+		reject(e)
   })
 })
 
@@ -292,14 +351,35 @@ function sendResponseAfterDelay(thisResponse, delay) {
 			params: params
 		}
 		logger.trace('messageData', messageData)
-		sendClientMessage(messageData)
-		.then(x => {
+		sendClientMessage({
+			action: 'sendMessage',
+			data: messageData
+		}).then(x => {
 			d.resolve(messageData)
-		})
-		.catch(err => d.reject("ERROR Emitted response",err))
+		}).catch(err => d.reject("ERROR Emitted response",err))
 	}, delay);
 	return d.promise;
 }
+
+/**
+ * Takes message id-related data and returns message data (docs: https://api.slack.com/methods/channels.history)
+ *
+ * @param  {Object} messageSpecs
+ * @param  {String} messageSpecs.team
+ * @param  {String} messageSpecs.channel
+ * @param  {String} messageSpecs.ts
+ * @return {Object}
+ */
+const getMessageBySpecs = messageSpecs => new Promise(function(resolve, reject) {
+	logger.trace(messageSpecs)
+	sendClientMessage({
+		action: 'getMessageData',
+		data: messageSpecs
+	}).then(messageData => {
+		logger.trace('messageData', messageData)
+		resolve(messageData)
+	})
+})
 
 // For webhooks
 exports.quickreply = function(reaction) {
@@ -330,8 +410,10 @@ exports.quickreply = function(reaction) {
 			username: alias
 		}
 	}
-	sendClientMessage(messageData)
-	.then(() => {
+	sendClientMessage({
+		action: 'sendMessage',
+		data: messageData
+	}).then(() => {
 		// 3. Post the payload to the API on behalf of user
 		handleMessage({
 				channel: reaction.callback_id, // converts to sender at handleMessage()

@@ -8,6 +8,11 @@ const logger = tracer.colorConsole({level: 'trace'})
 // const debug = true;
 // const logger = debug ? tracer.colorConsole({level: 'log'}) : {trace:()=>{},log:()=>{}};
 
+var slackKeychain
+
+
+const tempTeamID = 'T04NVHJBK'
+
 exports.oauth = function(req, res) {
 	// When a user authorizes an app, a code query parameter is passed on the oAuth endpoint. If that code is not there, we respond with an error message
   if (!req.query.code) {
@@ -26,7 +31,7 @@ exports.oauth = function(req, res) {
       if (error) {
         console.log(error);
       } else {
-				var slackKeychain = JSON.parse(body)
+				slackKeychain = JSON.parse(body)
 				console.log("🤓 Bot was authorised", slackKeychain)
         res.json(slackKeychain);
 
@@ -41,6 +46,8 @@ exports.oauth = function(req, res) {
 
 const initateSlackBot = function(thisBotKeychain) {
 	logger.trace(initateSlackBot);
+
+  slackKeychain = thisBotKeychain
 
 	// create a bot
 	bot = new SlackBot({
@@ -58,22 +65,22 @@ const initateSlackBot = function(thisBotKeychain) {
 	bot.on('start', () => {
 		logger.log('Slackbot has 🙏 connected.')
 
-		// TODO: Remove after debug
-    bot.postMessageToChannel('bot-testing', `*I'm your personal mind-palace. Invite me to this channel and ask me to remember things :)*`, {
-        icon_emoji: ':sparkles:'
-    });
+		// // TODO: Remove after debug
+    // bot.postMessageToChannel('bot-testing', `*I'm your personal mind-palace. Invite me to this channel and ask me to remember things :)*`, {
+    //     icon_emoji: ':sparkles:'
+    // });
 	});
 
 	bot.on('message', (message) => {
 		logger.trace('Slack event:', message)
 
-		// Only listen for text messages... for now.
-		if(message.type !== 'message') return false;
-
 		// Should send data to Chatbot and return messages for emitting
 		// TODO: Support postEphemeral(id, user, text, params) for slash commands
-		rtm.sendTyping(message.channel)
-		slack.handleMessage(thisBotKeychain, message)
+    const teamInfo = {
+      teamID: tempTeamID,
+      botUserID: thisBotKeychain.bot_user_id
+    }
+		slack.handleMessage(teamInfo, message)
 	})
 }
 
@@ -99,18 +106,62 @@ initateSlackBot({
 	bot_user_id: process.env.SLACK_BOT_USER_ID
 })
 
-slack.acceptClientMessageFunction(response => new Promise((resolve, reject) => {
+const handleActionsFromSlackController = response => {
   logger.trace('acceptClientMessageFunction', response)
+  switch (response.action) {
+    case 'sendMessage':
+      return sendMessage(response.data)
+      break;
+    case 'getMessageData':
+      return getMessageData(response.data)
+      break;
+    case 'setTyping':
+      return setTyping(response.data.team, response.data.channel, response.data.on)
+      break;
+  }
+}
+
+slack.acceptClientMessageFunction(handleActionsFromSlackController)
+
+const setTyping = (team, channel, on) => {
+  rtm.sendTyping(channel)
+}
+
+const sendMessage = messageData => new Promise(function(resolve, reject) {
   bot.postMessage(
 		// reaction.channel.id.charAt(0) === 'D' ? reaction.user.id : reaction.channel.id, // Identify by user OR by group
 		// Actually, previous line should be resolved by callback_id specified in the initial message
-		response.recipient,
-		response.text,
-    response.params
+		messageData.recipient,
+		messageData.text,
+    messageData.params
 	).then(res => {
     resolve(res)
   }).catch(e => {
     logger.error(e)
     reject(e)
   })
-}))
+})
+
+/**
+ * Takes message id-related data and returns message data (docs: https://api.slack.com/methods/channels.history)
+ *
+ * @param  {Object} messageSpecs
+ * @param  {String} messageSpecs.ts
+ * @param  {String} messageSpecs.channel
+ * @return {Object}
+ */
+const getMessageData = messageSpecs => new Promise(function(resolve, reject) {
+  logger.trace({ token: slackKeychain.bot_access_token, channel: messageSpecs.channel, latest: messageSpecs.ts, count: 1, inclusive: true })
+  request({
+    url: 'https://slack.com/api/channels.history',
+    qs: { token: slackKeychain.bot_access_token, channel: messageSpecs.channel, latest: messageSpecs.ts, count: 1, inclusive: true },
+    method: 'GET',
+  }, (error, response, body) => {
+    if (error) {
+      logger.error(error)
+    } else {
+      logger.trace(body.messages || body)
+      resolve(body.messages || body)
+    }
+  })
+})
