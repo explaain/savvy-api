@@ -1,15 +1,15 @@
 const request = require('request')
 const SlackBot = require('slackbots')
 const RtmClient = require('@slack/client').RtmClient
-const slack = require('../platforms/slack')
+const { WebClient } = require('@slack/client');
+const web = new WebClient(process.env.SLACK_OAUTH_ACCESS_TOKEN) // Currently this only works for the one team!
 
 const tracer = require('tracer')
 const logger = tracer.colorConsole({level: 'trace'})
-// const debug = true;
-// const logger = debug ? tracer.colorConsole({level: 'log'}) : {trace:()=>{},log:()=>{}};
+
+const slack = require('../platforms/slack')
 
 var slackKeychain
-
 
 const tempTeamID = 'T04NVHJBK'
 
@@ -152,16 +152,15 @@ const sendMessage = messageData => new Promise(function(resolve, reject) {
  */
 const getMessageData = messageSpecs => new Promise(function(resolve, reject) {
   logger.trace({ token: slackKeychain.bot_access_token, channel: messageSpecs.channel, latest: messageSpecs.ts, count: 1, inclusive: true })
-  request({
-    url: 'https://slack.com/api/channels.history',
-    qs: { token: slackKeychain.bot_access_token, channel: messageSpecs.channel, latest: messageSpecs.ts, count: 1, inclusive: true },
-    method: 'GET',
-  }, (error, response, body) => {
-    if (error) {
-      logger.error(error)
+  web.channels.history(messageSpecs.channel, { latest: messageSpecs.ts, count: 1, inclusive: true })
+  .then(res => {
+    if (res.ok && res.messages && res.messages.length) {
+      const messageData = res.messages[0]
+      messageData.channel = messageSpecs.channel
+      logger.trace(messageData)
+      resolve(messageData)
     } else {
-      logger.trace(body.messages || body)
-      resolve(body.messages || body)
+      logger.error(res.error)
     }
   })
 })
