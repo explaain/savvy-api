@@ -150,7 +150,7 @@ exports.handleMessage = (teamInfo, message) => {
 		case 'message':
 			// Respond only when the bot's involved
 			// But not if it's the bot posting.
- 			if ((!message.text || message.formsOfAddress.test(message.text)) && !message.bot_id)
+ 			if (message.subtype !== 'message_deleted' && (!message.text || message.formsOfAddress.test(message.text)) && !message.bot_id)
 				return messageReceived(message)
 		case 'quick_reply': // ???
 			// ???
