@@ -38,7 +38,7 @@ if (process.env.NODE_ENV === "test") {
 								type: 'message',
 								channel: 'C7BQBL138',
 								user: 'U04NVHJFD',
-								text: 'My very important Question',
+								text: 'My very important Answer',
 								ts: '1514745075.000017',
 								source_team: 'T04NVHJBK',
 								team: 'T04NVHJBK'
@@ -47,11 +47,11 @@ if (process.env.NODE_ENV === "test") {
 								type: 'message',
 								channel: 'C7BQBL138',
 								user: 'U04NVHJFD',
-								text: 'My very important Answer',
+								text: 'My very important Question',
 								ts: '1514745075.000017',
 								source_team: 'T04NVHJBK',
 								team: 'T04NVHJBK'
-							}
+							},
 						])
 						break
 				}
@@ -66,18 +66,14 @@ if (process.env.NODE_ENV === "test") {
 var bot;
 
 exports.acceptClientMessageFunction = function(messageFunction) {
-	console.log(123);
 	handedDown.clientMessageFunction = messageFunction
 }
 
 // For sending standalone messages
 const sendClientMessage = (data) => new Promise(function(resolve, reject) {
-	console.log(1)
 	if (handedDown.clientMessageFunction) {
-		console.log(2)
 		handedDown.clientMessageFunction(data)
 		.then(function(res) {
-			console.log(3)
 			resolve(res)
 		}).catch(function(e) {
 			logger.error(e)
@@ -123,7 +119,6 @@ function scopeMessage(botUserID, message) {
 			message.formsOfAddress = new RegExp(``,'i'); // listen to all messages
 			break;
 	}
-console.log(message);
 	return message;
 }
 
@@ -166,7 +161,7 @@ exports.handleMessage = (teamInfo, message) => {
 			if (message.reaction === 'beers')
 				return reactionAdded(teamInfo, message, true)
 		default:
-			console.log('aborting!')
+			console.log('Not a message for me! Ignoring this one.')
 			return new Promise((resolve, reject) => { resolve() })
 	}
 }
@@ -199,11 +194,11 @@ const reactionAdded = async (teamInfo, message, includeTitle) => {
 		count: includeTitle ? 2 : 1
 	}
 	var messageData = await getMessageBySpecs(messageSpecs)
-	const newMessage = transformMessage(teamInfo, messageData[messageData.length - 1])
+	const newMessage = transformMessage(teamInfo, messageData[0])
 	logger.trace('newMessage', newMessage)
 	// Save message to database
 	const context = { intent: 'storeMemory' }
-	if (includeTitle) context.title = messageData[0].text
+	if (includeTitle) context.title = messageData[1].text
 	return await packageAndHandleMessage(newMessage, context)
 }
 

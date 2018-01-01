@@ -124,7 +124,6 @@ exports.handleMessage = function(body) {
 				consecutiveFails: 0,
 				totalFailCount: 0
 			}
-			console.log(event)
 			const context = event.context || {}
 			if (event.platform) context.platform = event.platform
 			setContext(sender, 'failing', false);
@@ -827,9 +826,6 @@ const getResponseMessage = function(data) {
 		setContext(data.messageData[0].data.recipient.id, 'consecutiveFails', 0)
 	}
 
-	console.log(data)
-	console.log(data.messageData[0])
-	console.log(data.messageData[0].data)
 	return data
 }
 
