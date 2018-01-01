@@ -151,12 +151,11 @@ const sendMessage = messageData => new Promise(function(resolve, reject) {
  * @return {Object}
  */
 const getMessageData = messageSpecs => new Promise(function(resolve, reject) {
-  logger.trace({ token: slackKeychain.bot_access_token, channel: messageSpecs.channel, latest: messageSpecs.ts, count: 1, inclusive: true })
-  web.channels.history(messageSpecs.channel, { latest: messageSpecs.ts, count: 1, inclusive: true })
+  web.channels.history(messageSpecs.channel, { latest: messageSpecs.ts, count: messageSpecs.count || 1, inclusive: true })
   .then(res => {
     if (res.ok && res.messages && res.messages.length) {
-      const messageData = res.messages[0]
-      messageData.channel = messageSpecs.channel
+      const messageData = res.messages
+      messageData.forEach(m => m.channel = messageSpecs.channel)
       logger.trace(messageData)
       resolve(messageData)
     } else {

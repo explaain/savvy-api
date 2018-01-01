@@ -17,15 +17,49 @@ const handedDown = { clientMessageFunction: () => new Promise(function(resolve, 
 
 if (process.env.NODE_ENV === "test") {
   const sandbox = sinon.sandbox.create()
-  sandbox.stub(handedDown, 'clientMessageFunction').resolves({
-		type: 'message',
-		channel: 'C7BQBL138',
-		user: 'U04NVHJFD',
-		text: 'testing testing',
-		ts: '1514745075.000017',
-		source_team: 'T04NVHJBK',
-		team: 'T04NVHJBK'
-	})
+  sandbox.stub(handedDown, 'clientMessageFunction').callsFake(request => new Promise(function(resolve, reject) {
+		switch (request.action) {
+			case 'getMessageData':
+				switch (request.data.count) {
+					case 1:
+						resolve([{
+							type: 'message',
+							channel: 'C7BQBL138',
+							user: 'U04NVHJFD',
+							text: 'testing testing',
+							ts: '1514745075.000017',
+							source_team: 'T04NVHJBK',
+							team: 'T04NVHJBK'
+						}])
+						break
+					case 2:
+						resolve([
+							{
+								type: 'message',
+								channel: 'C7BQBL138',
+								user: 'U04NVHJFD',
+								text: 'My very important Question',
+								ts: '1514745075.000017',
+								source_team: 'T04NVHJBK',
+								team: 'T04NVHJBK'
+							},
+							{
+								type: 'message',
+								channel: 'C7BQBL138',
+								user: 'U04NVHJFD',
+								text: 'My very important Answer',
+								ts: '1514745075.000017',
+								source_team: 'T04NVHJBK',
+								team: 'T04NVHJBK'
+							}
+						])
+						break
+				}
+				break
+			default:
+				resolve()
+		}
+  }))
 }
 
 
@@ -128,7 +162,9 @@ exports.handleMessage = (teamInfo, message) => {
 			break
 		case 'reaction_added':
 			if (message.reaction === 'rocket')
-				return reactionAdded(teamInfo, message)
+				return reactionAdded(teamInfo, message, false)
+			if (message.reaction === 'beers')
+				return reactionAdded(teamInfo, message, true)
 		default:
 			console.log('aborting!')
 			return new Promise((resolve, reject) => { resolve() })
@@ -152,21 +188,23 @@ const messageReceived = message => {
 	return packageAndHandleMessage(message)
 }
 
-const reactionAdded = async (teamInfo, message) => {
+const reactionAdded = async (teamInfo, message, includeTitle) => {
 	// Get message ID
 	const messageID = message.item.ts
 	// Get message data
 	const messageSpecs = {
 		team: teamInfo.team, // @TODO: Sort this out so it's not hard-coded!!
 		channel: message.item.channel,
-		ts: message.item.ts
+		ts: message.item.ts,
+		count: includeTitle ? 2 : 1
 	}
 	var messageData = await getMessageBySpecs(messageSpecs)
-	messageData = transformMessage(teamInfo, messageData)
-	logger.trace('messageData now transformed', messageData)
+	const newMessage = transformMessage(teamInfo, messageData[messageData.length - 1])
+	logger.trace('newMessage', newMessage)
 	// Save message to database
 	const context = { intent: 'storeMemory' }
-	return await packageAndHandleMessage(messageData, context)
+	if (includeTitle) context.title = messageData[0].text
+	return await packageAndHandleMessage(newMessage, context)
 }
 
 const packageAndHandleMessage = (message, context) => new Promise((resolve, reject) => {

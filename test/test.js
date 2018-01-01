@@ -1301,7 +1301,6 @@ describe('Bulk', function() {
         channel: 'C7BQBL138',
         ts: '1514722340.000081'
       },
-      reaction: 'rocket',
       item_user: 'U04NVHJFD',
       event_ts: '1514722424.000052',
       ts: '1514722424.000052'
@@ -1311,8 +1310,9 @@ describe('Bulk', function() {
       message.text = text
       return await slack.handleMessage(slackKeychain, message)
     }
-    const sendSlackReaction = async text => {
+    const sendSlackReaction = async reaction => {
       const message = JSON.parse(JSON.stringify(reactionTemplate))
+      message.reaction = reaction
       return await slack.handleMessage(slackKeychain, message)
     }
     describe('Say hello', function() {
@@ -1361,7 +1361,7 @@ describe('Bulk', function() {
     describe('Store by reacting to a previous message', function() {
       var result
       before(async () => {
-        result = await sendSlackReaction()
+        result = await sendSlackReaction('rocket')
         return
       })
       it('should return a text message', () => {
@@ -1369,6 +1369,19 @@ describe('Bulk', function() {
       })
       it('should return confirmation', () => {
         assert.equal(result[0].text, 'I\'ve now remembered that for you! Testing testing')
+      })
+    })
+    describe('Store (plus title) by reacting to a previous message', function() {
+      var result
+      before(async () => {
+        result = await sendSlackReaction('beers')
+        return
+      })
+      it('should return a text message', () => {
+        assert(result[0].text)
+      })
+      it('should return confirmation', () => {
+        assert.equal(result[0].text, 'I\'ve now remembered that for you! My very important Question\n\nYour very important Answer')
       })
     })
   })

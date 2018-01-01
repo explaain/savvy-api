@@ -47,26 +47,26 @@ const AlgoliaParams = {
 if (process.env.NODE_ENV === "test") {
   const sandbox = sinon.sandbox.create()
   sandbox.stub(track, 'event').returns()
-  // sandbox.stub(Algolia, 'connect').returns({
-  //   getObject: () => {},
-  //   searchObjects: () => new Promise((resolve, reject) => {
-  //     resolve({
-  //       hits: [{
-  //         description: 'How often does Savvy index files?\n\n- Every 60 seconds'
-  //       }]
-  //     })
-  //   }),
-  //   getFirstFromSearch: () => new Promise((resolve, reject) => {
-  //     resolve({
-  //       description: 'How often does Savvy index files?\n\n- Every 60 seconds'
-  //     })
-  //   }),
-  //   saveObject: (user, object) => new Promise((resolve, reject) => {
-  //     if (!object.objectID) object.objectID = 12345
-  //     resolve(object)
-  //   }),
-  //   deleteObject: () => new Promise((resolve, reject) => { resolve() })
-  // })
+  sandbox.stub(Algolia, 'connect').returns({
+    getObject: () => {},
+    searchObjects: () => new Promise((resolve, reject) => {
+      resolve({
+        hits: [{
+          description: 'How often does Savvy index files?\n\n- Every 60 seconds'
+        }]
+      })
+    }),
+    getFirstFromSearch: () => new Promise((resolve, reject) => {
+      resolve({
+        description: 'How often does Savvy index files?\n\n- Every 60 seconds'
+      })
+    }),
+    saveObject: (user, object) => new Promise((resolve, reject) => {
+      if (!object.objectID) object.objectID = 12345
+      resolve(object)
+    }),
+    deleteObject: () => new Promise((resolve, reject) => { resolve() })
+  })
   sandbox.stub(Firebase, 'save').resolves({
     data: {
       objectID: ''
@@ -612,6 +612,7 @@ const saveToDb = function(user, card, requestData) {
     created: parseInt(new Date().getTime()/1000),
     modified: parseInt(new Date().getTime()/1000)
   }
+  if (card.title) data.title = card.title
   logger.trace('💎  Here\'s the data:', data)
   Algolia.connect(AlgoliaParams.appID, user.algoliaApiKey, user.organisationID + '__Cards').saveObject(user, data)
   .then(function(response) {
@@ -931,8 +932,8 @@ const getWrittenMemory = function(requestData) {
   //   listItems: requestData.listItems,
   // }
   memory.description = rewriteSentence(requestData.resolvedQuery)
-  memory.listItems = requestData.listItems
-  memory.sentence = memory.description // Temporary until we update chrome extension
+  if (requestData.title) memory.title = requestData.title
+  if (requestData.listItems) memory.listItems = requestData.listItems
   memory.extractedFrom = requestData.extractedFrom
   memory.attachments = requestData.attachments;
   memory.triggerURL = requestData.triggerURL;

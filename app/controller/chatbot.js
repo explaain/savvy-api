@@ -744,7 +744,7 @@ const getResponseMessage = function(data) {
 					break;
 
 				case 'storeMemory':
-					m.resultSentence = "I've now remembered that for you! " + m.sentence;
+					m.resultSentence = "I've now remembered that for you! " + (m.title ? m.title + '\n\n' : '') + m.sentence;
 					break;
 
 				case 'setTask.URL':
