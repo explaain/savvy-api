@@ -132,7 +132,7 @@ const transformMessage = function(teamInfo, message) {
 		team: message.team || teamInfo.teamID
 	}
 
-	message = scopeMessage(teamInfo.botUserID, message);
+	message = scopeMessage(teamInfo.__botUserID, message);
 
 	console.log("🔧🔧⚙️🔬 Transforming an API-able message: ", message)
 
@@ -140,7 +140,7 @@ const transformMessage = function(teamInfo, message) {
 }
 
 exports.handleMessage = (teamInfo, message) => {
-	logger.trace('handleMessage', /* teamInfo, */ message)
+	logger.trace('handleMessage', teamInfo, message)
 
 	// * Transform the message so the bot replies to the right user/channel etc.
 	// * Get rid of unwanted addressing (e.g. @forgetmenot)
