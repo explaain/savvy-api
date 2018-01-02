@@ -140,7 +140,7 @@ const transformMessage = function(teamInfo, message) {
 }
 
 exports.handleMessage = (teamInfo, message) => {
-	logger.trace('handleMessage', teamInfo, message)
+	logger.trace('handleMessage', /* teamInfo, */ message)
 
 	// * Transform the message so the bot replies to the right user/channel etc.
 	// * Get rid of unwanted addressing (e.g. @forgetmenot)

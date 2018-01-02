@@ -16,6 +16,7 @@ const api = require('../app/controller/api');
 const chatbot = require('../app/controller/chatbot');
 const slack = require('../app/platforms/slack');
 const properties = require('../app/config/properties.js');
+const Encrypt = require('../app/controller/db_encrypt.js');
 
 const tracer = require('tracer')
 const logger = tracer.colorConsole({level: 'debug'});
@@ -24,6 +25,81 @@ const logger = tracer.colorConsole({level: 'debug'});
 const AlgoliaSearch = require('algoliasearch');
 const AlgoliaClient = AlgoliaSearch(properties.algolia_app_id, properties.algolia_api_key, { protocol: 'https:' });
 const AlgoliaIndex = AlgoliaClient.initIndex(process.env.ALGOLIA_INDEX);
+
+
+const sandbox = sinon.sandbox.create()
+const track = {event: null}
+const nlp = {process: null}
+const uploader = {upload: null}
+const users = {authenticateSender: null, checkPermissions: null, fetchUserData: null}
+const Firebase = {save: null}
+const Algolia = {connect: null}
+sandbox.stub(track, 'event').returns()
+sandbox.stub(nlp, 'process').callsFake((sender, query, contexts) => new Promise((resolve, reject) => {
+  resolve({
+    source: 'agent',
+    resolvedQuery: query,
+    contexts: [],
+    score: 0.8600000143051147,
+    intent: query == 'hi' ? 'greeting' : (query.indexOf('The ') === 0 ? 'storeMemory' : 'query')
+  })
+}))
+sandbox.stub(uploader, 'upload').resolves('url_123')
+sandbox.stub(users, 'authenticateSender').resolves()
+sandbox.stub(users, 'checkPermissions').resolves()
+sandbox.stub(users, 'fetchUserData').resolves({
+  readAccess: null,
+  uploadTo: null
+})
+sandbox.stub(Firebase, 'save').resolves({
+  data: {
+    objectID: ''
+  }
+})
+sandbox.stub(Algolia, 'connect').callsFake((appID, apiKey, indexID) => {
+  switch (indexID) {
+    case 'organisations':
+    case '-local-organisations':
+      return {
+        getObject: () => new Promise((resolve, reject) => {
+          resolve({
+            objectID: '12345',
+            hello: 'U2FsdGVkX1/LHanxXxEyISHsMLrQANMxY6mkKDxyMGk=',
+            goodbye: 'U2FsdGVkX19eQm4bVEn/+Zkr72nGntIzcghHomDImT4='
+          })
+        }),
+        saveObject: (user, object) => new Promise((resolve, reject) => {
+          if (!object.objectID) object.objectID = 12345
+          resolve(object)
+        }),
+        deleteObject: () => new Promise((resolve, reject) => { resolve() })
+      }
+      break
+    default:
+      return {
+        getObject: () => {},
+        searchObjects: () => new Promise((resolve, reject) => {
+          resolve({
+            hits: [{
+              description: 'How often does Savvy index files?\n\n- Every 60 seconds'
+            }]
+          })
+        }),
+        getFirstFromSearch: () => new Promise((resolve, reject) => {
+          resolve({
+            description: 'How often does Savvy index files?\n\n- Every 60 seconds'
+          })
+        }),
+        saveObject: (user, object) => new Promise((resolve, reject) => {
+          if (!object.objectID) object.objectID = 12345
+          resolve(object)
+        }),
+        deleteObject: () => new Promise((resolve, reject) => { resolve() })
+      }
+  }
+})
+
+
 
 const temporaryMemories = []
 
@@ -190,7 +266,7 @@ const checkMemoryExistence = function(objectID) {
 
 
 describe('Bulk', function() {
-  this.timeout(10000);
+  this.timeout(20000);
   const sender = 'vZweCaZEWlZPx0gpQn2b1B7DFAZ2';
 
   describe('API', function() {
@@ -1382,6 +1458,83 @@ describe('Bulk', function() {
       })
       it('should return confirmation', () => {
         assert.equal(result[0].text, 'I\'ve now remembered that for you! My very important Question\n\nYour very important Answer')
+      })
+    })
+  })
+
+  describe('Database', () => {
+    const index = process.env.ALGOLIA_SLACK_AUTH_INDEX
+    const data = {
+      hello: 'hi',
+      __goodbye: 'bye',
+      deeper: {
+        one: '1111',
+        two: '2222'
+      },
+      slack: {
+        __botUserID: '12345765',
+        __botAccessToken: '12345543',
+        __accessToken: '12345234'
+      },
+      deeper2: [
+        'one1111',
+        'two2222'
+      ]
+    }
+    const keys = Object.keys(data)
+    const savedKeys = keys.concat(['objectID'])
+    const checkEveryKeyInObject = (obj, ftn) => {
+      Object.keys(obj).forEach(key => {
+        if (typeof obj[key] === 'object' || typeof obj[key] === 'array')
+          checkEveryKeyInObject(obj[key], ftn)
+        else
+          ftn(key, obj[key])
+      })
+    }
+    const checkEveryKeyInTwoObjects = (obj1, obj2, ftn) => {
+      Object.keys(obj1).forEach(key => {
+        if (typeof obj1[key] === 'object' || typeof obj1[key] === 'array')
+          checkEveryKeyInTwoObjects(obj1[key], obj2[key], ftn)
+        else
+          ftn(key, obj1[key], obj2[key])
+      })
+    }
+    var savedData
+    describe('Encrypt and store data', () => {
+      before(async () => savedData = await Encrypt.setData(index, data))
+
+      it('should be successfully encrypted', () => {
+        checkEveryKeyInObject(savedData, (key, val) => {
+          if (key.substring(0, 2) === '__') {
+            assert(typeof val === 'string')
+            assert(val.length === 44)
+          }
+        })
+      })
+      it('should be successfully saved', () => {
+        checkEveryKeyInTwoObjects(data, savedData, (key, val1, val2) => {
+          assert(val2)
+        })
+      })
+    })
+    describe('Retrieve and decrypt data', () => {
+      var retrievedData
+      before(async () => {
+        await new Promise(function(resolve, reject) {
+          setTimeout(() => resolve(), 2000)
+        })
+        retrievedData = await Encrypt.getData(index, savedData.objectID)
+      })
+
+      it('should be successfully retrieved', () => {
+        checkEveryKeyInTwoObjects(data, retrievedData, (key, val1, val2) => {
+          assert(val2)
+        })
+      })
+      it('should be successfully decrypted', () => {
+        checkEveryKeyInTwoObjects(data, retrievedData, (key, val1, val2) => {
+          assert(val1 === val2)
+        })
       })
     })
   })

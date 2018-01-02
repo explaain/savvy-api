@@ -1,17 +1,33 @@
+const tracer = require('tracer')
+const logger = tracer.colorConsole({level: 'log'})
 const request = require('request')
 const SlackBot = require('slackbots')
 const RtmClient = require('@slack/client').RtmClient
 const { WebClient } = require('@slack/client');
-const web = new WebClient(process.env.SLACK_OAUTH_ACCESS_TOKEN) // Currently this only works for the one team!
 
-const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'trace'})
+const Encrypt = require('../controller/db_encrypt.js');
+const SlackAuthIndex = process.env.ALGOLIA_SLACK_AUTH_INDEX
 
 const slack = require('../platforms/slack')
 
-var slackKeychain
-
-const tempTeamID = 'T04NVHJBK'
+const Orgs = [] // These details are loaded and decrypted from the db, then stored locally here for ease of access
+const getOrgs = async teamID => {
+  if (Orgs[teamID])
+    return Orgs[teamID]
+  else {
+    Orgs[teamID] = await Encrypt.getData(SlackAuthIndex, teamID)
+    return Orgs[teamID]
+  }
+}
+const getAllOrgs = async () => {
+  return await Encrypt.getAllData(SlackAuthIndex)
+}
+const setOrg = async (teamID, org) => {
+  org.slack.teamID = teamID
+  org.objectID = teamID
+  Orgs[teamID] = org
+  return await Encrypt.addData(SlackAuthIndex, org)
+}
 
 exports.oauth = function(req, res) {
 	// When a user authorizes an app, a code query parameter is passed on the oAuth endpoint. If that code is not there, we respond with an error message
@@ -25,18 +41,39 @@ exports.oauth = function(req, res) {
     // We'll do a GET call to Slack's `oauth.access` endpoint, passing our app's client ID, client secret, and the code we just got as query parameters.
     request({
       url: 'https://slack.com/api/oauth.access', //URL to hit
-      qs: {code: req.query.code, client_id: properties.slack_client_id, client_secret: properties.slack_client_secret}, //Query string data
+      qs: {code: req.query.code, client_id: process.env.SLACK_CLIENT_ID, client_secret: process.env.SLACK_CLIENT_SECRET}, //Query string data
       method: 'GET', //Specify the method
     }, function (error, response, body) {
-      if (error) {
-        console.log(error);
+      const slackKeychain = JSON.parse(body)
+      if (!slackKeychain.ok) {
+        logger.trace(slackKeychain);
+        logger.error(slackKeychain.error);
       } else {
-				slackKeychain = JSON.parse(body)
-				console.log("🤓 Bot was authorised", slackKeychain)
-        res.json(slackKeychain);
+				logger.trace("🤓 Bot was authorised", slackKeychain)
 
 				// TODO: Store this token in an encrypted DB so we can bootstrap bots after server restart
-				initateSlackBot(slackKeychain.bot)
+        const teamID = slackKeychain.team_id
+        const org = {
+          objectID: teamID,
+          slack: {
+            teamID: teamID,
+            __accessToken: slackKeychain.access_token,
+            __botUserID: slackKeychain.bot.bot_user_id,
+            __botAccessToken: slackKeychain.bot.bot_access_token,
+          }
+        }
+        getTeamInfo(teamID, org.slack)
+        .then(teamInfo => {
+          org.slack.name = teamInfo.name
+          org.slack.domain = teamInfo.domain
+          setOrg(teamID, org)
+        }).then(result => {
+          initateSlackBot(org.slack)
+          res.redirect(`https://${org.slack.domain}.slack.com/`)
+        }).catch(e => {
+          logger.error(e)
+          res.json(e)
+        })
       }
     })
   }
@@ -44,17 +81,15 @@ exports.oauth = function(req, res) {
 
 
 
-const initateSlackBot = function(thisBotKeychain) {
-	logger.trace(initateSlackBot);
-
-  slackKeychain = thisBotKeychain
+const initateSlackBot = function(slackTeam) {
+	logger.trace(initateSlackBot, slackTeam)
 
 	// create a bot
 	bot = new SlackBot({
-	   token: thisBotKeychain.bot_access_token
-	});
-	rtm = new RtmClient(thisBotKeychain.bot_access_token);
-	rtm.start();
+	   token: slackTeam.__botAccessToken
+	})
+	rtm = new RtmClient(slackTeam.__botAccessToken)
+	rtm.start()
 
 	logger.log('New Slackbot connecting.')
 
@@ -63,24 +98,23 @@ const initateSlackBot = function(thisBotKeychain) {
 	bot.on('close', () => logger.log("Slackbot 👺 CLOSED a websocket."))
 
 	bot.on('start', () => {
-		logger.log('Slackbot has 🙏 connected.')
+		logger.log('Slackbot has 🙏 connected to team ' + slackTeam.name)
 
 		// // TODO: Remove after debug
     // bot.postMessageToChannel('bot-testing', `*I'm your personal mind-palace. Invite me to this channel and ask me to remember things :)*`, {
     //     icon_emoji: ':sparkles:'
     // });
-	});
+	})
 
 	bot.on('message', (message) => {
-		logger.trace('Slack event:', message)
+    const messageTypesToIgnore = ['hello', 'reconnect_url', 'presence_change', 'desktop_notification', 'user_typing']
+    if (messageTypesToIgnore.indexOf(message.type) === -1 && message.subtype !== 'bot_message') {
+      logger.trace('Slack event:', message)
 
-		// Should send data to Chatbot and return messages for emitting
-		// TODO: Support postEphemeral(id, user, text, params) for slash commands
-    const teamInfo = {
-      teamID: tempTeamID,
-      botUserID: thisBotKeychain.bot_user_id
+      // Should send data to Chatbot and return messages for emitting
+      // TODO: Support postEphemeral(id, user, text, params) for slash commands
+      slack.handleMessage(slackTeam, message)
     }
-		slack.handleMessage(teamInfo, message)
 	})
 }
 
@@ -100,11 +134,6 @@ exports.events = function(req, res) {
   res.send({challenge: req.body.challenge})
 }
 
-// Dev bootstrap
-initateSlackBot({
-	bot_access_token: process.env.SLACK_BOT_USER_OAUTH_ACCESS_TOKEN,
-	bot_user_id: process.env.SLACK_BOT_USER_ID
-})
 
 const handleActionsFromSlackController = response => {
   logger.trace('acceptClientMessageFunction', response)
@@ -150,16 +179,51 @@ const sendMessage = messageData => new Promise(function(resolve, reject) {
  * @param  {String} messageSpecs.channel
  * @return {Object}
  */
-const getMessageData = messageSpecs => new Promise(function(resolve, reject) {
-  web.channels.history(messageSpecs.channel, { latest: messageSpecs.ts, count: messageSpecs.count || 1, inclusive: true })
-  .then(res => {
-    if (res.ok && res.messages && res.messages.length) {
-      const messageData = res.messages
-      messageData.forEach(m => m.channel = messageSpecs.channel)
-      logger.trace(messageData)
-      resolve(messageData)
-    } else {
-      logger.error(res.error)
-    }
+const getMessageData = async (teamID, messageSpecs) => {
+  logger.trace(getMessageData, teamID, messageSpecs)
+  const org = await getOrgs(teamID)
+  const web = new WebClient(org.slack.__botAccessToken)
+  const res = await web.channels.history(messageSpecs.channel, { latest: messageSpecs.ts, count: messageSpecs.count || 1, inclusive: true })
+  if (res.ok && res.messages && res.messages.length) {
+    const messageData = res.messages
+    messageData.forEach(m => m.channel = messageSpecs.channel)
+    logger.trace(messageData)
+    return messageData
+  } else {
+    logger.error(res.error)
+    return res.error
+  }
+}
+
+/**
+ * Takes team ID and returns team info (docs: https://api.slack.com/methods/team.info)
+ *
+ * @param  {String} teamID
+ * @return {Object}
+ */
+const getTeamInfo = async (teamID, auth) => {
+  logger.trace(getTeamInfo, teamID)
+  const org = auth ? { slack: auth } : await getOrgs(teamID)
+  const web = new WebClient(org.slack.__botAccessToken)
+  res = await web.team.info()
+  if (res.ok) {
+    const teamInfo = res.team
+    teamInfo.teamID = teamInfo.id
+    teamInfo.__botUserID = org.slack.__botUserID
+    return teamInfo
+  } else {
+    logger.error(res.error)
+    return res.error
+  }
+}
+
+const bootUp = async () => {
+  const allOrgs = await getAllOrgs()
+  allOrgs.forEach(async org => {
+    Orgs[org.objectID] = org
+    const teamInfo = await (org.slack.teamID)
+    initateSlackBot(org.slack, teamInfo)
   })
-})
+}
+
+bootUp()

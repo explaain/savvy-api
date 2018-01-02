@@ -9,11 +9,6 @@ exports.facebook_user_endpoint = 'https://graph.facebook.com/v2.6/';
 exports.facebook_profile_endpoint = 'https://graph.facebook.com/v2.6/me/messenger_profile';
 exports.facebook_get_started_payload = 'GET_STARTED_PAYLOAD';
 
-// Slack
-exports.slack_client_id = '4777596393.249085416213';
-// TODO:Regenerate this later for sy, use secure .env for hosting
-exports.slack_client_secret = '6889ca2ca749c80c189c34ef7b9e283f';
-
 // Google Maps api
 exports.google_maps_api = 'AIzaSyBUTELYTrlYEYbYaHjUiKtz5UcPXegaXlw';
 

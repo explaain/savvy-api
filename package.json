@@ -5,7 +5,9 @@
   "scripts": {
     "start": "node ./bin/www",
     "test": "ALGOLIA_INDEX=ForgetMeNot_Context_Test mocha",
-    "test-single": "ALGOLIA_INDEX=ForgetMeNot_Context_Test mocha --grep 'plus'"
+    "test-slack": "ALGOLIA_INDEX=ForgetMeNot_Context_Test mocha --grep 'Slack'",
+    "test-db": "ALGOLIA_INDEX=ForgetMeNot_Context_Test mocha --grep 'Database'",
+    "test-single": "ALGOLIA_INDEX=ForgetMeNot_Context_Test mocha --grep 'Database'"
   },
   "dependencies": {
     "@google/maps": "^0.3.1",
@@ -18,6 +20,7 @@
     "cloudinary": "^1.9.1",
     "cookie-parser": "^1.4.3",
     "cors": "^2.8.4",
+    "crypto-js": "^3.1.9-1",
     "debug": "^2.6.9",
     "dotenv": "^4.0.0",
     "express": "^4.16.2",

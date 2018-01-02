@@ -32,6 +32,9 @@ const Index = class Index {
           logger.error(err);
     			reject(err)
     		} else {
+          content.hits.forEach(hit => {
+            if (hit._highlightResult) delete hit._highlightResult
+          })
           logger.trace(content)
           resolve(content)
     		}
@@ -55,6 +58,17 @@ const Index = class Index {
       })
     })
     object.objectID = res.objectID
+    return object
+  }
+  async partialUpdateObject(user, object) {
+    logger.trace('partialUpdateObject', user, object)
+    const self = this
+    const res = await new Promise((resolve, reject) => {
+      self.AlgoliaIndex.partialUpdateObject(object, (err, content) => {
+    		if (err) reject(err)
+        else resolve(content)
+      })
+    })
     return object
   }
   deleteObject(sender, organisationID, objectID) {

@@ -44,55 +44,6 @@ const AlgoliaParams = {
 
 
 
-if (process.env.NODE_ENV === "test") {
-  const sandbox = sinon.sandbox.create()
-  sandbox.stub(track, 'event').returns()
-  sandbox.stub(Algolia, 'connect').returns({
-    getObject: () => {},
-    searchObjects: () => new Promise((resolve, reject) => {
-      resolve({
-        hits: [{
-          description: 'How often does Savvy index files?\n\n- Every 60 seconds'
-        }]
-      })
-    }),
-    getFirstFromSearch: () => new Promise((resolve, reject) => {
-      resolve({
-        description: 'How often does Savvy index files?\n\n- Every 60 seconds'
-      })
-    }),
-    saveObject: (user, object) => new Promise((resolve, reject) => {
-      if (!object.objectID) object.objectID = 12345
-      resolve(object)
-    }),
-    deleteObject: () => new Promise((resolve, reject) => { resolve() })
-  })
-  sandbox.stub(Firebase, 'save').resolves({
-    data: {
-      objectID: ''
-    }
-  })
-  sandbox.stub(nlp, 'process').callsFake((sender, query, contexts) => new Promise((resolve, reject) => {
-    resolve({
-      source: 'agent',
-      resolvedQuery: query,
-      contexts: [],
-      score: 0.8600000143051147,
-      intent: query == 'hi' ? 'greeting' : (query.indexOf('The ') === 0 ? 'storeMemory' : 'query')
-    })
-  }))
-  sandbox.stub(uploader, 'upload').resolves('url_123')
-  sandbox.stub(users, 'authenticateSender').resolves()
-  sandbox.stub(users, 'checkPermissions').resolves()
-  sandbox.stub(users, 'fetchUserData').resolves({
-    readAccess: null,
-    uploadTo: null
-  })
-}
-
-
-
-
 
 //
 // const data = {
