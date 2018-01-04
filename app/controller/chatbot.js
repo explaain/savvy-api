@@ -22,7 +22,7 @@ const Randoms = require('../controller/cannedResponses.js').Randoms
 
 
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'trace'});
+const logger = tracer.colorConsole({level: 'debug'});
 // tracer.setLevel('error');
 
 const C = {}; // C is for Context
@@ -31,16 +31,18 @@ const C = {}; // C is for Context
 
 var getContext = function(sender, context) {
 	try {
-		return C[sender][context];
+		const id = sender.id || sender.objectID || sender.uid
+		return C[id][context];
 	} catch(e) {
 		return null; //Probaby not safe!
 	}
 }
 var setContext = function(sender, context, value) {
 	try {
-		if (!C[sender])
-			C[sender] = {}
-		C[sender][context] = value;
+		const id = sender.id || sender.objectID || sender.uid
+		if (!C[id])
+			C[id] = {}
+		C[id][context] = value;
 	} catch(e) {
 		//Probaby not safe!
 	}
@@ -100,7 +102,10 @@ exports.fbInformation = function() {
 /* Recieve request */
 /**
  * @param {Object} body expects {Array} body.entry[0].messaging
-	e.g. body.entry = {
+ * @param {Object} body.entry[0].messaging[0].sender.id
+ * @param {Object} body.entry[0].messaging[0].message.text
+ *
+ * @example body.entry = [{
  	messaging: [
 		 {
 			 sender: {
@@ -111,7 +116,7 @@ exports.fbInformation = function() {
 			 },
 		 }
 	 ]
-	}
+ }]
 */
 exports.handleMessage = function(body) {
 	logger.trace('handleMessage', body, JSON.stringify(body))

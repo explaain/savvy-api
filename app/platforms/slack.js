@@ -8,9 +8,9 @@ const chatbotController = require('../controller/chatbot')
 const properties = require('../config/properties.js')
 
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'trace'})
+const logger = tracer.colorConsole({level: 'debug'})
 // const debug = true
-// const logger = debug ? tracer.colorConsole({level: 'log'}) : {trace:()=>{},log:()=>{}}
+// const logger = debug ? tracer.colorConsole({level: 'debug'}) : {trace:()=>{},log:()=>{}}
 // tracer.setLevel('error')
 
 const handedDown = { clientMessageFunction: () => new Promise(function(resolve, reject) { resolve() }) }

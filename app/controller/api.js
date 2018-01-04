@@ -12,7 +12,7 @@
 
 
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'trace'})
+const logger = tracer.colorConsole({level: 'debug'})
 // tracer.setLevel('warn');
 const sinon = require('sinon')
 const Q = require("q")
@@ -41,8 +41,39 @@ const AlgoliaParams = {
   }
 }
 
+if (process.env.NODE_ENV === "test") {
+  const sandbox = sinon.sandbox.create()
+  sandbox.stub(track, 'event').returns()
+  sandbox.stub(users, 'authenticateSender').resolves()
+  sandbox.stub(users, 'checkPermissions').resolves()
+  sandbox.stub(users, 'fetchUserData').resolves({
+    readAccess: null,
+    uploadTo: null
+  })
 
-
+  sandbox.stub(Algolia, 'connect').callsFake((appID, apiKey, indexID) => {
+    return {
+      getObject: () => {},
+      searchObjects: () => new Promise((resolve, reject) => {
+        resolve({
+          hits: [{
+            description: 'The Company Address is 123 Fake Street'
+          }]
+        })
+      }),
+      getFirstFromSearch: () => new Promise((resolve, reject) => {
+        resolve({
+          description: 'The Company Address is 123 Fake Street'
+        })
+      }),
+      saveObject: (user, object) => new Promise((resolve, reject) => {
+        if (!object.objectID) object.objectID = 12345
+        resolve(object)
+      }),
+      deleteObject: () => new Promise((resolve, reject) => { resolve() })
+    }
+  })
+}
 
 
 //

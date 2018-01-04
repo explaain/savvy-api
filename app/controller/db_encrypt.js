@@ -1,5 +1,5 @@
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'log'})
+const logger = tracer.colorConsole({level: 'debug'})
 const sinon = require('sinon')
 const Algolia = require('../controller/db_algolia')
 const CryptoJS = require("crypto-js")
