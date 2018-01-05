@@ -12,7 +12,7 @@
 
 
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'debug'})
+const logger = tracer.colorConsole({level: 'trace'})
 // tracer.setLevel('warn');
 const sinon = require('sinon')
 const Q = require("q")
@@ -51,28 +51,42 @@ if (process.env.NODE_ENV === "test") {
     uploadTo: null
   })
 
-  sandbox.stub(Algolia, 'connect').callsFake((appID, apiKey, indexID) => {
-    return {
-      getObject: () => {},
-      searchObjects: () => new Promise((resolve, reject) => {
-        resolve({
-          hits: [{
-            description: 'The Company Address is 123 Fake Street'
-          }]
-        })
-      }),
-      getFirstFromSearch: () => new Promise((resolve, reject) => {
-        resolve({
-          description: 'The Company Address is 123 Fake Street'
-        })
-      }),
-      saveObject: (user, object) => new Promise((resolve, reject) => {
-        if (!object.objectID) object.objectID = 12345
-        resolve(object)
-      }),
-      deleteObject: () => new Promise((resolve, reject) => { resolve() })
-    }
-  })
+  // sandbox.stub(Algolia, 'connect').callsFake((appID, apiKey, indexID) => {
+  //   return {
+  //     getObject: () => {},
+  //     searchObjects: () => new Promise((resolve, reject) => {
+  //       // resolve({
+  //       //   hits: [{
+  //       //     description: 'The Company Address is 123 Fake Street'
+  //       //   }]
+  //       // })
+  //       resolve({
+  //         hits: [
+  //           {
+  //             description: 'How often does Savvy index files?\n\n- Every 60 seconds'
+  //           },
+  //           {
+  //             description: 'Indexing Rules',
+  //             type: 'file'
+  //           },
+  //           {
+  //             description: 'Savvy indexes files on a regular basis - see Indexing Rules for more info'
+  //           },
+  //         ]
+  //       })
+  //     }),
+  //     getFirstFromSearch: () => new Promise((resolve, reject) => {
+  //       resolve({
+  //         description: 'The Company Address is 123 Fake Street'
+  //       })
+  //     }),
+  //     saveObject: (user, object) => new Promise((resolve, reject) => {
+  //       if (!object.objectID) object.objectID = 12345
+  //       resolve(object)
+  //     }),
+  //     deleteObject: () => new Promise((resolve, reject) => { resolve() })
+  //   }
+  // })
 }
 
 
@@ -956,5 +970,5 @@ const getGeneralIntent = function(intent) {
 }
 
 if (process.env.NODE_ENV !== "test") {
-  rescheduleAllReminders()
+  // rescheduleAllReminders()
 }

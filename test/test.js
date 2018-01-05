@@ -19,7 +19,7 @@ const properties = require('../app/config/properties.js');
 const Encrypt = require('../app/controller/db_encrypt.js');
 
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'debug'});
+const logger = tracer.colorConsole({level: 'trace'});
 
 // Algolia setup
 const AlgoliaSearch = require('algoliasearch');
@@ -75,27 +75,36 @@ sandbox.stub(Algolia, 'connect').callsFake((appID, apiKey, indexID) => {
         deleteObject: () => new Promise((resolve, reject) => { resolve() })
       }
       break
-    default:
-      return {
-        getObject: () => {},
-        searchObjects: () => new Promise((resolve, reject) => {
-          resolve({
-            hits: [{
-              description: 'How often does Savvy index files?\n\n- Every 60 seconds'
-            }]
-          })
-        }),
-        getFirstFromSearch: () => new Promise((resolve, reject) => {
-          resolve({
-            description: 'How often does Savvy index files?\n\n- Every 60 seconds'
-          })
-        }),
-        saveObject: (user, object) => new Promise((resolve, reject) => {
-          if (!object.objectID) object.objectID = 12345
-          resolve(object)
-        }),
-        deleteObject: () => new Promise((resolve, reject) => { resolve() })
-      }
+    // default:
+    //   return {
+    //     getObject: () => {},
+    //     searchObjects: () => new Promise((resolve, reject) => {
+    //       resolve({
+    //         hits: [
+    //           {
+    //             description: 'How often does Savvy index files?\n\n- Every 60 seconds1'
+    //           },
+    //           {
+    //             description: 'Indexing Rules',
+    //             type: 'file'
+    //           },
+    //           {
+    //             description: 'Savvy indexes files on a regular basis - see Indexing Rules for more info'
+    //           },
+    //         ]
+    //       })
+    //     }),
+    //     getFirstFromSearch: () => new Promise((resolve, reject) => {
+    //       resolve({
+    //         description: 'How often does Savvy index files?\n\n- Every 60 seconds2'
+    //       })
+    //     }),
+    //     saveObject: (user, object) => new Promise((resolve, reject) => {
+    //       if (!object.objectID) object.objectID = 12345
+    //       resolve(object)
+    //     }),
+    //     deleteObject: () => new Promise((resolve, reject) => { resolve() })
+    //   }
   }
 })
 
@@ -318,7 +327,7 @@ describe('Bulk', function() {
         done()
       })
       it('should bring back a result with the "sentence" parameter "' + expectedQueryReturn + '"', function(done) {
-        assert.equal(results.body.memories[0].description, expectedQueryReturn)
+        assert.equal(results.body.memories[0].description || results.body.memories[0].content, expectedQueryReturn)
         done()
       })
     })
@@ -574,6 +583,7 @@ describe('Bulk', function() {
       })
 
       it('should be interpreted as a "query" or "Default Fallback Intent"', function(done) {
+        logger.debug(results.body.messageData[0].data)
         assert(results.body.requestData.intent == 'query' || results.body.requestData.intent == 'Default Fallback Intent')
         done()
       })
@@ -594,7 +604,7 @@ describe('Bulk', function() {
         sendChatbotRequest(sender, greeting, results, done)
       })
 
-      it('should be interpreted as a "greeting"', function([done]) {
+      it('should be interpreted as a "greeting"', function(done) {
         assert(results.body.requestData.intent == 'greeting')
         done()
       })
@@ -1418,6 +1428,7 @@ describe('Bulk', function() {
         return
       })
       it('should return a text message', () => {
+        logger.debug(result)
         assert(result[0].text)
       })
       it('should return the answer', () => {
@@ -1455,6 +1466,28 @@ describe('Bulk', function() {
       before(async () => {
         result = await sendSlackReaction('beers')
         return
+      })
+      it('should return a text message', () => {
+        assert(result[0].text)
+      })
+      it('should return confirmation', () => {
+        assert.equal(result[0].text, 'I\'ve now remembered that for you! My very important Question\n\nYour very important Answer')
+      })
+    })
+    describe('Ask a question, then ask for more results', function() {
+      var result
+      before(async () => {
+        await sendSlackMessage('What\'s the Savvy colour?')
+        result = await slack.interactive(JSON.parse( '{"type":"interactive_message","actions":[{"name":"results","type":"button","value":"more-results","text":"Give me more results"}],"callback_id":"results-options","team":{"id":"T04NVHJBK","domain":"explaain"},"channel":{"id":"C7BQBL138","name":"bot-testing"},"user":{"id":"U04NVHJFD","name":"jeremy"},"action_ts":"1515101782.306526","message_ts":"1515101537.000341","attachment_id":"1","token":"Yrn00Mm2UXAMpEGrSc5GYTpF","is_app_unfurl":false,"original_message":{"text":"Here\'s what I '
+          + 'found:","username":"ForgetMeNot_local","bot_id":"B7DRNAZ0Q","attachments":[{"callback_id":"vZweCaZEWlZPx0gpQn2b1B7DFAZ2","fallback":"Oops, you can\'t quick-reply","footer":"Quick'
+          + 'actions","id":1,"color":"FED33C","actions":[{"id":"1","name":"USER_FEEDBACK_TOP","text":"\\ud83d\\ude0d","type":"button","value":"\\ud83d\\ude0d","style":""},{"id":"2","name":"USER_FEEDBACK_MIDDLE","text":"\\u270f\\ufe0f","type":"button","value":"\\u270f\\ufe0f","style":""},{"id":"3","name":"USER_FEEDBACK_BOTTOM","text":"\\ud83d\\ude14","type":"button","value":"\\ud83d\\ude14","style":""}]},{"author_name":"From: Savvy 1 pager - Generic","title":"What is Savvy?\\n\\n- Savvy is an app'
+          + 'that lives where you work. It works on its own website, via a browser extension and Slack. It connects to the tools you use at work, like Google Drive, Dropbox, Trello and more, and allows you to find the answers to the questions you have wherever you are.\\n- You interact with it in natural language. You can ask it questions like, \\u201cwhere are the latest financial projections\\u201d or \\u201cwhat\\u2019s our holiday policy?\\u201d It\\u2019ll return links to the best files and'
+          + 'documents to answer your question.","id":2,"color":"645AEF","fallback":"What is Savvy?\\n\\n- Savvy is an app that lives where you work. It works on its own website, via a browser extension and Slack. It connects to the tools you use at work, like Google Drive, Dropbox, Trello and more, and allows you to find the answers to the questions you have wherever you are.\\n- You interact with it in natural language. You can ask it questions like, \\u201cwhere are the latest financial'
+          + 'projections\\u201d or \\u201cwhat\\u2019s our holiday policy?\\u201d It\\u2019ll return links to the best files and documents to answer your question."},{"id":3,"fields":[{"title":"Created","value":"Tue Oct 31 2017","short":true},{"title":"Modified","value":"Fri Dec 01 2017","short":true}],"fallback":"[no preview available]"},{"author_name":"From: Savvy For Publishers","text":"What is Savvy?","id":4,"fallback":"What is Savvy?"},{"author_name":"From: Savvy 1 pager -'
+          + 'Generic","text":"You interact with it in natural language. You can ask it questions like, \\u201cwhere are the latest financial projections\\u201d or \\u201cwhat\\u2019s our holiday policy?\\u201d It\\u2019ll return links to the best files and documents to answer your question.","id":5,"fallback":"You interact with it in natural language. You can ask it questions like, \\u201cwhere are the latest financial projections\\u201d or \\u201cwhat\\u2019s our holiday policy?\\u201d'
+          + 'It\\u2019ll return links to the best files and documents to answer your question."}],"type":"message","subtype":"bot_message","ts":"1515101537.000341"},"response_url":"https:\\/\\/hooks.slack.com\\/actions\\/T04NVHJBK\\/294374436274\\/f9EO0Mo8HKwbA65D7gV1RKND","trigger_id":"294405711476.4777596393.887022949ae4a6b337c02f1a794a3beb"}'
+        ))
+        return result
       })
       it('should return a text message', () => {
         assert(result[0].text)

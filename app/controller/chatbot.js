@@ -22,16 +22,19 @@ const Randoms = require('../controller/cannedResponses.js').Randoms
 
 
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'debug'});
+const logger = tracer.colorConsole({level: 'trace'});
 // tracer.setLevel('error');
 
 const C = {}; // C is for Context
 
+const getSenderID = sender => sender.id || sender.objectID || sender.uid
 
+const getC = sender => C[getSenderID(sender)]
+const setC = (sender, c) => C[getSenderID(sender)] = c
 
 var getContext = function(sender, context) {
 	try {
-		const id = sender.id || sender.objectID || sender.uid
+		const id = getSenderID(sender)
 		return C[id][context];
 	} catch(e) {
 		return null; //Probaby not safe!
@@ -39,10 +42,10 @@ var getContext = function(sender, context) {
 }
 var setContext = function(sender, context, value) {
 	try {
-		const id = sender.id || sender.objectID || sender.uid
+		const id = getSenderID(sender)
 		if (!C[id])
 			C[id] = {}
-		C[id][context] = value;
+			C[id][context] = value;
 	} catch(e) {
 		//Probaby not safe!
 	}
@@ -118,119 +121,58 @@ exports.fbInformation = function() {
 	 ]
  }]
 */
-exports.handleMessage = function(body) {
+exports.handleMessage = body => new Promise((resolve, reject) => {
 	logger.trace('handleMessage', body, JSON.stringify(body))
-	const d = Q.defer()
-	try {
-		body.entry[0].messaging.forEach(function(event) {
-			sender = event.sender;
-			if (!C[sender]) C[sender] = {
-				lastResults: [],
-				consecutiveFails: 0,
-				totalFailCount: 0
-			}
-			const context = event.context || {}
-			if (event.platform) context.platform = event.platform
-			setContext(sender, 'failing', false);
-			var firstPromise;
-			try {
-				postback = null;
-				postback = event.postback.payload;
-			} catch (err) {}
-			if (postback) {
-				firstPromise = handlePostbacks({sender: sender}, postback)
-				logger.trace()
-			} else if (event.message) {
-				if (event.message.quick_reply) {
-					//sendSenderAction(sender, 'mark_seen');
-					firstPromise = handleQuickReplies({sender: sender}, event.message.quick_reply)
-				}	else if ((text = event.message.text)) {
-					//sendSenderAction(sender, 'typing_on'); // Ideally this would happen after checking we actually want to respond
-					// Handle a text message from this sender
-					switch(text) {
-						case "test":
-							createTextMessage(sender, "Test reply!");
-							break;
-						case "begin":
-							firstPromise = handlePostbacks({sender: sender}, properties.facebook_get_started_payload)
-							break;
-						case "account":
-							fetchUserData(sender);
-							break;
-						case "location":
-							setTimeZone(sender)
-							break;
-						case "subscribe":
-							subscribeUser(sender)
-							break;
-						case "unsubscribe":
-							unsubscribeUser(sender)
-							break;
-						case "subscribestatus":
-							subscribeStatus(sender)
-							break;
-						case "test memory":
-							newTimeBasedMemory(sender)
-							break;
-						case "set timezone":
-							setLocation(sender)
-							break;
-						case "whats my time zone":
-							userLocation(sender)
-							break;
-						case "test this":
-							updateUserLocation(sender, "Bristol")
-							break;
-						default: {
-							var result = {}
-							const extraData = event.message.attachments ? { attachments: event.message.attachments } : null
-							firstPromise = intentConfidence(sender, text, context)
-							setContext(sender, 'apiaiContexts', null) // Maybe don't always want to delete this straight away?
-						}
-					}
-					setContext(sender, 'expectingAttachment', null);
-				} else if ((attachments = event.message.attachments)) {
-					if (!attachments[0].payload.sticker_id) {
-						firstPromise = prepareAttachments({sender: sender}, attachments)
-					}
-					else {
-						const p = Q.defer()
-						logger.info('Sticker sent - sending no response')
-						p.resolve()
-						firstPromise = p.promise
-					}
-				}
-			}
+	if (!body || !body.entry || !body.entry[0] || !body.entry[0].messaging || !body.entry[0].messaging.length)
+		throw new Error('No message defined')
 
-			if (!firstPromise || !firstPromise.then) {
-				const message = createTextMessage(sender, 'Sorry, I didn\'t understand that!') // Should use GiveUp function
-				firstPromise = createMessagePromise({sender: sender}, message)
+	body.entry[0].messaging.forEach(event => {
+		const sender = event.sender;
+		const context =  Object.assign(event.context || {}, { platform: event.platform } || {}) || {}
+		logger.trace(context)
+		const postback = event.postback ? (event.postback.payload || null) : null
+		// if (event.platform) context.platform = event.platform
+		if (!getC(sender)) setC(sender, {
+			lastResults: [],
+			consecutiveFails: 0,
+			totalFailCount: 0
+		})
+		setContext(sender, 'failing', false)
+		var firstPromise
+		if (postback) {
+			firstPromise = handlePostbacks({sender: sender}, postback)
+			logger.trace()
+		} else if (event.message) {
+			if (event.message.quick_reply) {
+				firstPromise = handleQuickReplies({sender: sender}, event.message.quick_reply)
+			}	else if ((text = event.message.text)) {
+				// Handle a text message from this sender
+				// const extraData = event.message.attachments ? { attachments: event.message.attachments } : null
+				firstPromise = intentConfidence(sender, text, context)
+				setContext(sender, 'apiaiContexts', null)
+				setContext(sender, 'expectingAttachment', null);
+			} else if ((attachments = event.message.attachments) && !attachments[0].payload.sticker_id)
+				firstPromise = prepareAttachments({sender: sender}, attachments)
+			else
+				firstPromise = new Promise((resolve, reject) => { resolve() })
+		} else {
+			const message = createTextMessage(sender, 'Sorry, I didn\'t understand that!') // Should use GiveUp function
+			firstPromise = createMessagePromise({sender: sender}, message)
+		}
+		firstPromise
+		.then(function(res) {
+			const responseMessage = res ? getResponseMessage(res) : null
+			if (res && res.memories) { // Not sure if this is the right condition?
+				setContext(sender, 'lastAction', res)
 			}
-			firstPromise
-			.then(function(res) {
-				logger.trace('res:', res)
-				const responseMessage = res ? getResponseMessage(res) : null
-				logger.trace('responseMessage:', responseMessage)
-				logger.trace('responseMessage first message data:', responseMessage.messageData[0].data)
-				if (res && res.memories) { //Not sure if this is the right condition?
-					setContext(sender, 'lastAction', res)
-				}
-				if (responseMessage) responseMessage.messageData.push.apply(responseMessage.messageData, onboardingCheck(sender, res.requestData.intent))
-				d.resolve(responseMessage)
-			}).then(function() {
-
-			}).catch(function(e) {
-				logger.error(e)
-				d.reject(e)
-			}).done()
-		});
-	} catch(e) {
-		logger.error('-- Error processing the webhook! --')
-		logger.error(e)
-		d.reject(e)
-	}
-	return d.promise
-}
+			if (responseMessage) responseMessage.messageData.push.apply(responseMessage.messageData, onboardingCheck(sender, res.requestData.intent))
+			resolve(responseMessage)
+		}).catch(function(e) {
+			logger.error(e)
+			reject(e)
+		})
+	})
+})
 
 const onboardingCheck = function(sender, intent) {
 	if (getContext(sender, 'onboarding')) {
@@ -281,8 +223,7 @@ curl -X POST -H "Content-Type: application/json" -d '{
 
 */
 
-const handlePostbacks = function(requestData, payload) {
-	const d = Q.defer()
+const handlePostbacks = (requestData, payload) => new Promise((resolve, reject) => {
 	try {
 		const payloadCode = payload.split('-data-')[0]
 		const payloadData = payload.split('-data-')[1]
@@ -290,25 +231,24 @@ const handlePostbacks = function(requestData, payload) {
 			case properties.facebook_get_started_payload: //Should this be in messenger.js?
 				// sendSenderAction(sender, 'typing_on');
 				var allMessageData = firstMessage(requestData.sender)
-				d.resolve({requestData: requestData, messageData: allMessageData})
-				break;
+				resolve({requestData: requestData, messageData: allMessageData})
+				break
 
 			case "REQUEST_SPECIFIC_MEMORY":
-				var data = getContext(sender, 'lastAction')
+				var data = getContext(requestData.sender, 'lastAction')
 				data.requestData.hitNum = parseInt(payloadData)
 				delete data.messageData
-				d.resolve(data)
-				break;
+				resolve(data)
+				break
 
 			default:
-				d.reject()
+				reject()
 		}
 	} catch(e) {
 		logger.error(e)
-		d.reject(e)
+		reject(e)
 	}
-	return d.promise
-}
+})
 
 const handleQuickReplies = function(requestData, quickReply) {
 	logger.trace(handleQuickReplies)
@@ -354,6 +294,16 @@ const handleQuickReplies = function(requestData, quickReply) {
 			data.requestData.hitNum = data.requestData.hitNum+1 || 1
 			delete data.messageData
 			d.resolve(data)
+			break;
+
+		case "REQUEST_MORE_RESULTS":
+			var data = getContext(sender, 'lastAction')
+			data.requestData.moreResults = true // This should be generalised
+			delete data.messageData
+			d.resolve(data)
+
+			var messageData = createTextMessage(sender, "Sure thing - type your message below and I'll attach it...")
+			d.resolve({requestData: requestData, messageData: [{data: messageData}]})
 			break;
 
 		case "CORRECTION_ADD_ATTACHMENT":
@@ -452,9 +402,9 @@ function sendGenericMessage(recipient, type, counter) {
 	if (!Randoms.texts[type])
 		type = 'dunno';
 	if (type == 'dunno') {
-		setContext(sender, 'failing', true)
-		increaseContext(sender, 'totalFailCount')
-		if (getContext(sender, 'consecutiveFails') < 4) increaseContext(sender, 'consecutiveFails');
+		setContext(recipient, 'failing', true)
+		increaseContext(recipient, 'totalFailCount')
+		if (getContext(recipient, 'consecutiveFails') < 4) increaseContext(recipient, 'consecutiveFails');
 	}
 	if (typeof counter!=undefined) counter = 0
 	const text = (Array.isArray(Randoms.texts[type][0])) ? Randoms.texts[type][counter] : Randoms.texts[type];
@@ -508,7 +458,7 @@ const createMessagePromise = function(requestData, messageData) {
 }
 
 
-function createTextMessage(recipient, message, quickReplies) {
+function createTextMessage(recipient, message, quickReplies, cards) {
 	logger.trace(createTextMessage, recipient, message, quickReplies)
 	try {
 
@@ -522,6 +472,12 @@ function createTextMessage(recipient, message, quickReplies) {
 		if (message.text) {
 			message.text = message.text.replace(/"/g, '\"').replace(/'/g, '\'').replace(/\//g, '\/').replace(/‘/g, '\‘').replace(/’/g, '\’').replace(/’/g, '\’');
 			messageData.message.text = message.text
+		}
+		if (cards) {
+			messageData.message.cards = cards.map(card => {
+				if (!card.description) card.description = card.resultSentence || card.sentence || card.content || card.actionSentence
+				return card
+			})
 		}
 		if (message.attachment) {
 			const messageAttachment = message.attachment.attachment_id ? {
@@ -593,8 +549,8 @@ function sendCorrectionMessage(recipient) {
 			text: "Whoops - was there something you would have preferred me to do?"
     }
   };
-	logger.log(getContext(sender, 'lastAction'))
-	switch (getContext(sender, 'lastAction').requestData.intent) {
+	logger.log(getContext(recipient, 'lastAction'))
+	switch (getContext(recipient, 'lastAction').requestData.intent) {
 		case 'setTask.dateTime':
 		case 'setTask.URL':
 		case 'storeMemory':
@@ -610,7 +566,7 @@ function sendCorrectionMessage(recipient) {
 				["💬 Store this memory", "CORRECTION_QUERY_TO_STORE"],
 			]
 			messageData.message.quick_replies = getQuickReplies(quickReplies)
-			if (getContext(sender, 'lastAction').failed) {
+			if (getContext(recipient, 'lastAction').failed) {
 				messageData.message.quick_replies = [messageData.message.quick_replies[2]]
 			}
 			break;
@@ -710,6 +666,7 @@ function intentConfidence(sender, message, extraData) {
   .then(function(res) {
 		if (res.requestData && res.requestData.intent == "Default Fallback Intent")
 			res.requestData.intent = 'query'
+		logger.debug(res)
 		d.resolve(res)
   }).catch(function(e) {
     logger.error(e);
@@ -822,8 +779,9 @@ const getResponseMessage = function(data) {
 	logger.log(m)
 	if (!data.messageData && m) {
 		m = prepareResult(sender, m)
-		data.messageData = [{data: createTextMessage(sender, {text: m.resultSentence || m.actionSentence || m.sentence, attachment: m.attachments && m.attachments[0] || null}, quickReplies)}]
+		data.messageData = [{data: createTextMessage(sender, {text: m.resultSentence || m.actionSentence || m.sentence, attachment: m.attachments && m.attachments[0] || null}, quickReplies, data.memories)}]
 		if (followUp) data.messageData.push({data: followUp, delay: 2000})
+		logger.debug(data.messageData[0].data.message.cards.length)
 	}
 
 	// ???

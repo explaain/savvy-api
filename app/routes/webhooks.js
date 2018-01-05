@@ -12,7 +12,7 @@ router.get('/', messengerController.tokenVerification)
 router.post('/', messengerController.handleMessage)
 
 router.get('/slack/oauth', slackInterface.oauth)
-router.post('/slack/quickreply', slackInterface.quickreply)
+router.post('/slack/interactive', slackInterface.interactive)
 router.post('/slack/events', slackInterface.events)
 
 module.exports = router

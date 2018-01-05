@@ -8,7 +8,7 @@ const chatbotController = require('../controller/chatbot')
 const properties = require('../config/properties.js')
 
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'debug'})
+const logger = tracer.colorConsole({level: 'trace'})
 // const debug = true
 // const logger = debug ? tracer.colorConsole({level: 'debug'}) : {trace:()=>{},log:()=>{}}
 // tracer.setLevel('error')
@@ -17,41 +17,30 @@ const handedDown = { clientMessageFunction: () => new Promise(function(resolve, 
 
 if (process.env.NODE_ENV === "test") {
   const sandbox = sinon.sandbox.create()
+  const makeMessage = text => {
+    return {
+      type: 'message',
+      text: text,
+      channel: 'C7BQBL138',
+      user: 'U04NVHJFD',
+      ts: '1514745075.000017',
+      source_team: 'T04NVHJBK',
+      team: 'T04NVHJBK'
+    }
+  }
   sandbox.stub(handedDown, 'clientMessageFunction').callsFake(request => new Promise(function(resolve, reject) {
 		switch (request.action) {
 			case 'getMessageData':
 				switch (request.data.count) {
 					case 1:
-						resolve([{
-							type: 'message',
-							channel: 'C7BQBL138',
-							user: 'U04NVHJFD',
-							text: 'testing testing',
-							ts: '1514745075.000017',
-							source_team: 'T04NVHJBK',
-							team: 'T04NVHJBK'
-						}])
+						resolve([
+              makeMessage('testing testing')
+            ])
 						break
 					case 2:
 						resolve([
-							{
-								type: 'message',
-								channel: 'C7BQBL138',
-								user: 'U04NVHJFD',
-								text: 'My very important Answer',
-								ts: '1514745075.000017',
-								source_team: 'T04NVHJBK',
-								team: 'T04NVHJBK'
-							},
-							{
-								type: 'message',
-								channel: 'C7BQBL138',
-								user: 'U04NVHJFD',
-								text: 'My very important Question',
-								ts: '1514745075.000017',
-								source_team: 'T04NVHJBK',
-								team: 'T04NVHJBK'
-							},
+							makeMessage('My very important Answer'),
+							makeMessage('My very important Question')
 						])
 						break
 				}
@@ -188,7 +177,7 @@ const reactionAdded = async (teamInfo, message, includeTitle) => {
 	const messageID = message.item.ts
 	// Get message data
 	const messageSpecs = {
-		team: teamInfo.team, // @TODO: Sort this out so it's not hard-coded!!
+		team: teamInfo.team,
 		channel: message.item.channel,
 		ts: message.item.ts,
 		count: includeTitle ? 2 : 1
@@ -281,6 +270,7 @@ function handleResponseGroup(response) {
 	logger.trace(handleResponseGroup, response)
   const d = Q.defer();
   const promises = response && response.messageData ? response.messageData.map(function(singleResponse) {
+    singleResponse.data.message.moreResults = response.requestData.moreResults
 		logger.trace(singleResponse.data)
 		return sendResponseAfterDelay(singleResponse.data, (singleResponse.delay || 0) * 1000)
 	}) : []
@@ -296,6 +286,7 @@ function handleResponseGroup(response) {
 
 function sendResponseAfterDelay(thisResponse, delay) {
 	logger.trace(sendResponseAfterDelay, thisResponse, delay)
+  logger.trace(JSON.stringify(thisResponse))
 	const d = Q.defer();
 
 	// For push-reminders where Chatbot specifies recipient.id
@@ -309,7 +300,7 @@ function sendResponseAfterDelay(thisResponse, delay) {
 
 	if(thisResponse.message.attachment && thisResponse.message.attachment.payload) {
 		if(thisResponse.message.attachment.payload.elements) {
-			logger.log("Displaying a list of attachments")
+			logger.trace("Displaying a list of attachments")
 
 			params.attachments.push({
         "fallback": "Here's a list of related memories.",
@@ -321,7 +312,7 @@ function sendResponseAfterDelay(thisResponse, delay) {
 				var memoryAttachment = {
 	        "fallback": "Inspect memory",
 	        "color": "#FED33C",
-					"callback_id": thisResponse.recipient, // Specify who the bot is going to speak on behalf of, and where.
+					"callback_id": 'memories', // Specify who the bot is going to speak on behalf of, and where.
 	        "title": memory.title,
 					"text": "",
 					"thumb_url": memory.image_url,
@@ -343,7 +334,7 @@ function sendResponseAfterDelay(thisResponse, delay) {
 		} else if(thisResponse.message.attachment.type == "image") {
 			// Display an attachment
 			// NB: Slack bug (https://github.com/slackhq/slack-api-docs/issues/53) where image_url doesn't show at all :/
-			logger.log("Displaying an image attachment")
+			logger.trace("Displaying an image attachment")
 
 			params.attachments.push({
         "fallback": "An image that's attached for your memory.",
@@ -355,12 +346,67 @@ function sendResponseAfterDelay(thisResponse, delay) {
 	}
 
 	if(thisResponse.message.quick_replies && thisResponse.message.quick_replies.length > 0) {
-		logger.log("Adding buttons");
+		logger.trace("Adding buttons");
+
+    console.log('thisResponse.recipient', thisResponse.recipient);
+
+	}
+
+
+  if (thisResponse.message.cards && thisResponse.message.cards.length) {
+    thisResponse.message.text = 'Here\'s what I found:'
+    thisResponse.message.cards.forEach((card, i) => {
+      const attachment = {
+        fields: [],
+      }
+      if (card.fileTitle) attachment.author_name = 'From: ' + card.fileTitle
+      if (card.fileUrl) attachment.author_link = card.fileTitle
+      if (card.fileType) attachment.author_icon = getFileTypeImage(card.fileType)
+      if (i === 0) {
+        attachment.color = '#645AEF'
+        attachment.title = card.description
+        const fields = []
+        if (card.created) fields.push({
+          title: 'Created',
+          value: new Date(card.created * 1000).toDateString(),
+          short: true
+        })
+        if (card.modified) fields.push({
+          title: 'Modified',
+          value: new Date(card.modified * 1000).toDateString(),
+          short: true
+        })
+        params.attachments.push(attachment)
+        params.attachments.push({ fields: fields })
+      } else if (i < 5 && thisResponse.message.moreResults) {
+        attachment.text = card.description
+        params.attachments.push(attachment)
+      }
+    })
+    delete thisResponse.message.cards
+    if (!thisResponse.message.moreResults) {
+      params.attachments.push({
+        footer: "More",
+        fallback: "Oops, you can't ask for more",
+        callback_id: 'results-options', // Specify who the bot is going to speak on behalf of, and where.
+        color: "#645AEF",
+        attachment_type: "default",
+        actions: [
+          {
+            type: 'button',
+            name: 'results',
+            style: 'primary',
+            text: 'Give me more results',
+            value: 'more-results',
+          }
+        ]
+      })
+    }
 
 		params.attachments.push({
 			"footer": "Quick actions",
 			"fallback": "Oops, you can't quick-reply",
-			"callback_id": thisResponse.recipient, // Specify who the bot is going to speak on behalf of, and where.
+			"callback_id": 'reaction-buttons', // Specify who the bot is going to speak on behalf of, and where.
       "color": "#FED33C",
       "attachment_type": "default",
 			"actions": []
@@ -374,20 +420,25 @@ function sendResponseAfterDelay(thisResponse, delay) {
 				"value": reply.title
 			})
 		})
-	}
+  }
+
 	// if (!thisResponse.sender_action) sendSenderAction(thisResponse.recipient.id, 'typing_on');
 	setTimeout(function() {
 		// if(params.attachments) console.log("Buttons should attach", params.attachments[0].actions)
 		const messageData = {
+      teamID: thisResponse.recipient.platformSpecific.team,
 			recipient: thisResponse.recipient.platformSpecific.channel,
 			text: thisResponse.message.text,
-			params: params
+      params: params
+			// params: params
 		}
+    console.log(JSON.stringify(messageData))
 		logger.trace('messageData', messageData)
 		sendClientMessage({
 			action: 'sendMessage',
 			data: messageData
 		}).then(x => {
+      console.log(messageData);
 			d.resolve(messageData)
 		}).catch(err => d.reject("ERROR Emitted response",err))
 	}, delay);
@@ -415,49 +466,90 @@ const getMessageBySpecs = messageSpecs => new Promise(function(resolve, reject) 
 })
 
 // For webhooks
-exports.quickreply = function(reaction) {
+exports.interactive = function(action) {
 
-	logger.log("Quick reply pressed", reaction)
+	logger.trace("User interacted with something interactive!", action)
 
-	// Define this specific message sender as part of the conversational chain
-	// Even if the bot itself is speaking on behalf of the user
-	// var alias = `On behalf of ${reaction.channel.id.charAt(0) === 'D' ? reaction.user.name : "#"+reaction.channel.name}`
-	var alias = `${reaction.user.name} via ForgetMeNot` // Maybe say when you're reacting for the group?
-	// console.log("Bot posting as", alias, aliasDirectory[alias])
-
-	// 1. Remove the UI buttons
-	var noBtnMessage = reaction.original_message
-	noBtnMessage.attachments = {}
-	noBtnMessage.ts = reaction.message_ts
-	noBtnMessage.channel = reaction.channel.id
-
-	res.json(noBtnMessage)
-
-
-	// 2. Post reply to slack on behalf of user
-	const messageData = {
-		recipient: reaction.callback_id,
-		text: reaction.actions[0].value,
-		params: {
-			as_user: false,
-			username: alias
-		}
-	}
-	sendClientMessage({
-		action: 'sendMessage',
-		data: messageData
-	}).then(() => {
-		// 3. Post the payload to the API on behalf of user
-		handleMessage({
-				channel: reaction.callback_id, // converts to sender at handleMessage()
-				quick_reply: reaction.actions[0].name // the payload string
-			}
-			// emitter({recipient: reaction.callback_id})
-			// I get the feeling the Chatbot specifies the recipient.id anyway.
-		)
-	}).catch((e)=>logger.log(e))
+  switch (action.callback_id) {
+    case 'reaction-buttons':
+      return reactionButtonPressed(action)
+    case 'results-options':
+      return resultsOptionsPressed(action)
+  }
 }
 
 exports.dropdown = function() {
 	//
+}
+
+
+const reactionButtonPressed = action => new Promise((resolve, reject) => {
+  // Define this specific message sender as part of the conversational chain
+  // Even if the bot itself is speaking on behalf of the user
+  // var alias = `On behalf of ${action.channel.id.charAt(0) === 'D' ? action.user.name : "#"+action.channel.name}`
+  var alias = `${action.user.name} via ForgetMeNot` // Maybe say when you're reacting for the group?
+  // console.log("Bot posting as", alias, aliasDirectory[alias])
+
+  // 1. Remove the UI buttons
+  var noBtnMessage = action.original_message
+  logger.trace(action.original_message);
+  noBtnMessage.attachments.forEach((attachment, i) => {
+    if (attachment.callback_id === 'reaction-buttons')
+    noBtnMessage.attachments[i] = { footer: 'Thanks for your feedback!' }
+  })
+  noBtnMessage.params = {
+    attachments: noBtnMessage.attachments
+  }
+  noBtnMessage.ts = action.message_ts
+  noBtnMessage.recipient = action.channel.id
+  noBtnMessage.teamID = action.team.id
+  logger.trace(noBtnMessage)
+  // res.json(noBtnMessage)
+
+  sendClientMessage({
+    action: 'updateMessage',
+    data: noBtnMessage
+  }).then(res => {
+    logger.trace('Reaction sent!', res);
+  }).catch(e => {
+    logger.error(e)
+  })
+
+
+  // // 2. Post reply to slack on behalf of user
+  // const messageData = {
+  // 	recipient: action.callback_id,
+  // 	text: action.actions[0].value,
+  // 	params: {
+  // 		as_user: false,
+  // 		username: alias
+  // 	}
+  // }
+  // sendClientMessage({
+  // 	action: 'sendMessage',
+  // 	data: messageData
+  // }).then(() => {
+  // 	// 3. Post the payload to the API on behalf of user
+  // 	handleMessage({
+  // 			channel: action.callback_id, // converts to sender at handleMessage()
+  // 			quick_reply: action.actions[0].name // the payload string
+  // 		}
+  // 		// emitter({recipient: action.callback_id})
+  // 		// I get the feeling the Chatbot specifies the recipient.id anyway.
+  // 	)
+  // }).catch((e)=>logger.error(e))
+
+})
+
+const resultsOptionsPressed = action => {
+  if (action.actions[0].value === 'more-results') {
+    return packageAndHandleMessage({
+      quick_reply: 'REQUEST_MORE_RESULTS',
+      sender: {
+        team: action.team.id,
+        channel: action.channel.id,
+        user: action.user.id,
+      }
+    })
+  }
 }

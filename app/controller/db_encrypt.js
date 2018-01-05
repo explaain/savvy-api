@@ -1,5 +1,5 @@
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'debug'})
+const logger = tracer.colorConsole({level: 'trace'})
 const sinon = require('sinon')
 const Algolia = require('../controller/db_algolia')
 const CryptoJS = require("crypto-js")
@@ -37,6 +37,7 @@ exports.getAllData = async (index) => {
   const allDecryptedData = allEncryptedData.hits.map(encryptedData => {
     return decryptData(encryptedData)
   })
+  logger.trace(allDecryptedData)
   return allDecryptedData
 }
 
@@ -71,32 +72,38 @@ exports.addData = async (index, data) => {
 
 const decryptData = data => {
   logger.trace(decryptData, data)
-  const decryptedData = {}
-  Object.keys(data).forEach(key => {
-    const val = data[key]
-    if (typeof val === 'array' || typeof val === 'object')
-      decryptedData[key] = decryptData(val)
-    else if (key === 'objectID' || key.substring(0, 2) !== '__')
-      decryptedData[key] = val
-    else
-      decryptedData[key] = CryptoJS.AES.decrypt(val, EncryptionKey).toString(CryptoJS.enc.Utf8)
-  })
-  logger.trace('decryptedData:', decryptedData)
-  return decryptedData
+  if (data) {
+    const decryptedData = {}
+    Object.keys(data).forEach(key => {
+      const val = data[key]
+      if (typeof val === 'array' || typeof val === 'object')
+        decryptedData[key] = decryptData(val)
+      else if (typeof val === 'string' && key.substring(0, 2) === '__')
+        decryptedData[key] = CryptoJS.AES.decrypt(val, EncryptionKey).toString(CryptoJS.enc.Utf8)
+      else
+        decryptedData[key] = val
+    })
+    logger.trace('decryptedData:', decryptedData)
+    return decryptedData
+  } else
+    return data
 }
 
 const encryptData = data => {
   logger.trace(encryptData, data)
-  const encryptedData = {}
-  Object.keys(data).forEach(key => {
-    const val = data[key]
-    if (typeof val === 'array' || typeof val === 'object')
-      encryptedData[key] = encryptData(val)
-    else if (key === 'objectID' || key.substring(0, 2) !== '__')
-      encryptedData[key] = val
-    else
-      encryptedData[key] = CryptoJS.AES.encrypt(val, EncryptionKey).toString()
-  })
-  logger.trace('encryptedData:', encryptedData)
-  return encryptedData
+  if (data) {
+    const encryptedData = {}
+    Object.keys(data).forEach(key => {
+      const val = data[key]
+      if (typeof val === 'array' || typeof val === 'object')
+        encryptedData[key] = encryptData(val)
+      else if (typeof val === 'string' && key.substring(0, 2) === '__')
+        encryptedData[key] = CryptoJS.AES.encrypt(val, EncryptionKey).toString()
+      else
+        encryptedData[key] = val
+    })
+    logger.trace('encryptedData:', encryptedData)
+    return encryptedData
+  } else
+    return data
 }
