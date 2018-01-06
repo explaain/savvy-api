@@ -289,137 +289,143 @@ function sendResponseAfterDelay(thisResponse, delay) {
   logger.trace(JSON.stringify(thisResponse))
 	const d = Q.defer();
 
-	// For push-reminders where Chatbot specifies recipient.id
-	// Otherwise, look for `channel.id` and `channel` (the format for different Slack event types vary)
-	// thisResponse.recipient = thisResponse.recipient.id || thisResponse.channel.id || thisResponse.channel;
-	// rtm.sendTyping(emitter.recipient)
+  try {
 
-	var params = {
-		attachments: []
-	}
+  	// For push-reminders where Chatbot specifies recipient.id
+  	// Otherwise, look for `channel.id` and `channel` (the format for different Slack event types vary)
+  	// thisResponse.recipient = thisResponse.recipient.id || thisResponse.channel.id || thisResponse.channel;
+  	// rtm.sendTyping(emitter.recipient)
 
-	if(thisResponse.message.attachment && thisResponse.message.attachment.payload) {
-		if(thisResponse.message.attachment.payload.elements) {
-			logger.trace("Displaying a list of attachments")
+  	var params = {
+  		attachments: []
+  	}
 
-			params.attachments.push({
-        "fallback": "Here's a list of related memories.",
-				"pretext": "",
-        "footer": "Related reminders"
-			})
+  	if(thisResponse.message.attachment && thisResponse.message.attachment.payload) {
+  		if(thisResponse.message.attachment.payload.elements) {
+  			logger.trace("Displaying a list of attachments")
 
-			thisResponse.message.attachment.payload.elements.forEach(memory => {
-				var memoryAttachment = {
-	        "fallback": "Inspect memory",
-	        "color": "#FED33C",
-					"callback_id": 'memories', // Specify who the bot is going to speak on behalf of, and where.
-	        "title": memory.title,
-					"text": "",
-					"thumb_url": memory.image_url,
-					"actions": []
-	      }
+  			params.attachments.push({
+          "fallback": "Here's a list of related memories.",
+  				"pretext": "",
+          "footer": "Related reminders"
+  			})
 
-				// Seems these haven't been implemented in Chatbot.js yet
-				memory.buttons.forEach(button => {
-					memoryAttachment.actions.push({
-						"type": "button",
-						"name": button.payload,
-						"text": button.title,
-						"value": button.title
-					})
-				})
+  			thisResponse.message.attachment.payload.elements.forEach(memory => {
+  				var memoryAttachment = {
+  	        "fallback": "Inspect memory",
+  	        "color": "#FED33C",
+  					"callback_id": 'memories', // Specify who the bot is going to speak on behalf of, and where.
+  	        "title": memory.title,
+  					"text": "",
+  					"thumb_url": memory.image_url,
+  					"actions": []
+  	      }
 
-				params.attachments.push(memoryAttachment)
-			})
-		} else if(thisResponse.message.attachment.type == "image") {
-			// Display an attachment
-			// NB: Slack bug (https://github.com/slackhq/slack-api-docs/issues/53) where image_url doesn't show at all :/
-			logger.trace("Displaying an image attachment")
+  				// Seems these haven't been implemented in Chatbot.js yet
+  				memory.buttons.forEach(button => {
+  					memoryAttachment.actions.push({
+  						"type": "button",
+  						"name": button.payload,
+  						"text": button.title,
+  						"value": button.title
+  					})
+  				})
 
-			params.attachments.push({
-        "fallback": "An image that's attached for your memory.",
-				"thumb_url": thisResponse.message.attachment.payload.url,
-				"text": "Attached image: "+thisResponse.message.attachment.payload.url,
-        // "footer": "Attached image"
-			})
-		}
-	}
+  				params.attachments.push(memoryAttachment)
+  			})
+  		} else if(thisResponse.message.attachment.type == "image") {
+  			// Display an attachment
+  			// NB: Slack bug (https://github.com/slackhq/slack-api-docs/issues/53) where image_url doesn't show at all :/
+  			logger.trace("Displaying an image attachment")
 
-	if(thisResponse.message.quick_replies && thisResponse.message.quick_replies.length > 0) {
-		logger.trace("Adding buttons");
+  			params.attachments.push({
+          "fallback": "An image that's attached for your memory.",
+  				"thumb_url": thisResponse.message.attachment.payload.url,
+  				"text": "Attached image: "+thisResponse.message.attachment.payload.url,
+          // "footer": "Attached image"
+  			})
+  		}
+  	}
 
-    console.log('thisResponse.recipient', thisResponse.recipient);
+  	if(thisResponse.message.quick_replies && thisResponse.message.quick_replies.length > 0) {
+  		logger.trace("Adding buttons");
 
-	}
+      console.log('thisResponse', thisResponse);
+      console.log('thisResponse.message.cards', thisResponse.message.cards);
+
+  	}
 
 
-  if (thisResponse.message.cards && thisResponse.message.cards.length) {
-    thisResponse.message.text = 'Here\'s what I found:'
-    thisResponse.message.cards.forEach((card, i) => {
-      const attachment = {
-        fields: [],
-      }
-      if (card.fileTitle) attachment.author_name = 'From: ' + card.fileTitle
-      if (card.fileUrl) attachment.author_link = card.fileTitle
-      if (card.fileType) attachment.author_icon = getFileTypeImage(card.fileType)
-      if (i === 0) {
-        attachment.color = '#645AEF'
-        attachment.title = card.description
-        const fields = []
-        if (card.created) fields.push({
-          title: 'Created',
-          value: new Date(card.created * 1000).toDateString(),
-          short: true
-        })
-        if (card.modified) fields.push({
-          title: 'Modified',
-          value: new Date(card.modified * 1000).toDateString(),
-          short: true
-        })
-        params.attachments.push(attachment)
-        params.attachments.push({ fields: fields })
-      } else if (i < 5 && thisResponse.message.moreResults) {
-        attachment.text = card.description
-        params.attachments.push(attachment)
-      }
-    })
-    delete thisResponse.message.cards
-    if (!thisResponse.message.moreResults) {
-      params.attachments.push({
-        footer: "More",
-        fallback: "Oops, you can't ask for more",
-        callback_id: 'results-options', // Specify who the bot is going to speak on behalf of, and where.
-        color: "#645AEF",
-        attachment_type: "default",
-        actions: [
-          {
-            type: 'button',
-            name: 'results',
-            style: 'primary',
-            text: 'Give me more results',
-            value: 'more-results',
-          }
-        ]
+    if (thisResponse.message.cards && thisResponse.message.cards.length) {
+      thisResponse.message.text = 'Here\'s what I found:'
+      thisResponse.message.cards.forEach((card, i) => {
+        const attachment = {
+          fields: [],
+        }
+        if (card.fileTitle) {attachment.author_name = 'From: ' + card.fileTitle}
+        if (card.fileUrl) attachment.author_link = card.fileTitle
+        attachment.author_icon = getFileTypeImage(card.fileType)
+        if (i === 0) {
+          attachment.color = '#645AEF'
+          attachment.title = card.description || card.title
+          const fields = []
+          if (card.created) fields.push({
+            title: 'Created',
+            value: new Date(card.created * 1000).toDateString(),
+            short: true
+          })
+          if (card.modified) fields.push({
+            title: 'Modified',
+            value: new Date(card.modified * 1000).toDateString(),
+            short: true
+          })
+          params.attachments.push(attachment)
+          params.attachments.push({ fields: fields })
+        } else if (i < 5 && thisResponse.message.moreResults) {
+          attachment.text = card.description || card.title
+          params.attachments.push(attachment)
+        }
       })
+      delete thisResponse.message.cards
+      if (!thisResponse.message.moreResults) {
+        params.attachments.push({
+          footer: "More",
+          fallback: "Oops, you can't ask for more",
+          callback_id: 'results-options', // Specify who the bot is going to speak on behalf of, and where.
+          color: "#645AEF",
+          attachment_type: "default",
+          actions: [
+            {
+              type: 'button',
+              name: 'results',
+              style: 'primary',
+              text: 'Give me more results',
+              value: 'more-results',
+            }
+          ]
+        })
+      }
+
+  		params.attachments.push({
+  			"footer": "Quick actions",
+  			"fallback": "Oops, you can't quick-reply",
+  			"callback_id": 'reaction-buttons', // Specify who the bot is going to speak on behalf of, and where.
+        "color": "#FED33C",
+        "attachment_type": "default",
+  			"actions": []
+      })
+
+  		thisResponse.message.quick_replies.forEach(reply => {
+  			params.attachments[params.attachments.length-1].actions.push({
+  				"type": "button",
+  				"name": reply.payload,
+  				"text": reply.title,
+  				"value": reply.title
+  			})
+  		})
     }
-
-		params.attachments.push({
-			"footer": "Quick actions",
-			"fallback": "Oops, you can't quick-reply",
-			"callback_id": 'reaction-buttons', // Specify who the bot is going to speak on behalf of, and where.
-      "color": "#FED33C",
-      "attachment_type": "default",
-			"actions": []
-    })
-
-		thisResponse.message.quick_replies.forEach(reply => {
-			params.attachments[params.attachments.length-1].actions.push({
-				"type": "button",
-				"name": reply.payload,
-				"text": reply.title,
-				"value": reply.title
-			})
-		})
+  } catch(e) {
+    logger.error(e)
   }
 
 	// if (!thisResponse.sender_action) sendSenderAction(thisResponse.recipient.id, 'typing_on');
@@ -551,5 +557,28 @@ const resultsOptionsPressed = action => {
         user: action.user.id,
       }
     })
+  }
+}
+
+const getFileTypeImage = fileType => {
+  switch (fileType) {
+    case 'application/vnd.google-apps.document':
+    case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+      return 'https://lh4.ggpht.com/-wROmWQVYTcjs3G6H0lYkBK2nPGYsY75Ik2IXTmOO2Oo0SMgbDtnF0eqz-BRR1hRQg=w300'
+    case 'application/vnd.google-apps.spreadsheet':
+    case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+      return 'http://icons.iconarchive.com/icons/dtafalonso/android-lollipop/512/Sheets-icon.png'
+    case 'application/vnd.google-apps.presentation':
+    case 'application/vnd.openxmlformats-officedocument.presentationml.presentation':
+      return 'http://cliparting.com/wp-content/uploads/2017/07/Google-slides-icon-free-download-at-icons8-clipart.png'
+    case 'application/pdf':
+      return 'https://cdn1.iconfinder.com/data/icons/adobe-acrobat-pdf/154/adobe-acrobat-pdf-file-512.png'
+    case 'image/png':
+    case 'image/jpg':
+    case 'image/jpeg':
+    case 'image/gif':
+      return 'https://cdn3.iconfinder.com/data/icons/faticons/32/picture-01-512.png'
+    default:
+      return 'https://cdn4.iconfinder.com/data/icons/48-bubbles/48/12.File-512.png'
   }
 }
