@@ -579,6 +579,7 @@ const getFileTypeImage = fileType => {
     case 'image/gif':
       return 'https://cdn3.iconfinder.com/data/icons/faticons/32/picture-01-512.png'
     default:
-      return 'https://cdn4.iconfinder.com/data/icons/48-bubbles/48/12.File-512.png'
+      return 'https://lh4.ggpht.com/-wROmWQVYTcjs3G6H0lYkBK2nPGYsY75Ik2IXTmOO2Oo0SMgbDtnF0eqz-BRR1hRQg=w300'
+      // return 'https://cdn4.iconfinder.com/data/icons/48-bubbles/48/12.File-512.png'
   }
 }
