@@ -12,7 +12,7 @@
 
 
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'trace'})
+const logger = tracer.colorConsole({level: 'debug'})
 // tracer.setLevel('warn');
 const sinon = require('sinon')
 const Q = require("q")
@@ -491,7 +491,12 @@ const recallMemory = function(requestData) {
       hitsPerPage: 10,
 			// filters: (attachments ? 'hasAttachments: true' : '')
 		};
-    logger.trace(requestData, userData)
+    requestData.filters = {
+      type: requestData.parameters.preferredCardType
+    }
+    if (requestData.filters.type && requestData.filters.type.length && requestData.filters.type !== 'all')
+      searchParams.filters = 'type: "' + requestData.filters.type + '"'
+    logger.trace(searchParams)
     return searchForCards(requestData.sender.algoliaApiKey, requestData.sender.organisationID, searchParams)
 	}).then(function(content) {
 		if (!content.hits.length) {

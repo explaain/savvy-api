@@ -16,7 +16,7 @@ const Q = require("q");
 
 
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'trace'});
+const logger = tracer.colorConsole({level: 'debug'});
 // tracer.setLevel('error');
 
 

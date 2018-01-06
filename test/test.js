@@ -19,7 +19,7 @@ const properties = require('../app/config/properties.js');
 const Encrypt = require('../app/controller/db_encrypt.js');
 
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'trace'});
+const logger = tracer.colorConsole({level: 'debug'});
 
 // Algolia setup
 const AlgoliaSearch = require('algoliasearch');
@@ -1433,6 +1433,26 @@ describe('Bulk', function() {
       })
       it('should return the answer', () => {
         assert.equal(result[0].text, 'How often does Savvy index files?\n\n- Every 60 seconds')
+      })
+    })
+    describe('Ask a question that wants a file', function() {
+      var result
+      before(async () => {
+        result = await sendSlackMessage('What is the innovation file?')
+        return
+      })
+      it('should return a text message', () => {
+        logger.debug(result)
+        assert(result[0].text)
+      })
+      it('should return an answer', () => {
+        assert.equal(result[0].text, 'Here\'s what I found:')
+      })
+      it('should return only files', () => {
+        logger.debug(result[0].params.attachments)
+        result[0].params.attachments.filter(attachment => attachment.author_name).forEach(attachment => {
+          assert.notEqual(attachment.author_name.indexOf('From: '), 0)
+        })
       })
     })
     describe('Store the company address', function() {

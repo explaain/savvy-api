@@ -1,5 +1,5 @@
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'trace'})
+const logger = tracer.colorConsole({level: 'debug'})
 const request = require('request')
 
 exports.process = (sender, text, contexts) => new Promise(function(resolve, reject) {

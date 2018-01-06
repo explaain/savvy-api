@@ -389,7 +389,7 @@ function sendResponseAfterDelay(thisResponse, delay) {
       delete thisResponse.message.cards
       if (!thisResponse.message.moreResults) {
         params.attachments.push({
-          footer: "More",
+          title: thisResponse.filters && thisResponse.filters.type && thisResponse.filters.type !== 'all' ? 'Returning only: ' + ({ file: 'Files', p: 'Content from Files', manual: 'Manually Created Content' }[thisResponse.filters.type]) : 'Returning all types of content',
           fallback: "Oops, you can't ask for more",
           callback_id: 'results-options', // Specify who the bot is going to speak on behalf of, and where.
           color: "#645AEF",

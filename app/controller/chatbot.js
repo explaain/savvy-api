@@ -458,7 +458,7 @@ const createMessagePromise = function(requestData, messageData) {
 }
 
 
-function createTextMessage(recipient, message, quickReplies, cards) {
+function createTextMessage(recipient, message, quickReplies, cardData) {
 	logger.trace(createTextMessage, recipient, message, quickReplies)
 	try {
 
@@ -467,14 +467,15 @@ function createTextMessage(recipient, message, quickReplies, cards) {
 		}
 		const messageData = {
 			recipient: recipient,
-			message: {}
+			message: {},
+			filters: cardData.filters
 		};
 		if (message.text) {
 			message.text = message.text.replace(/"/g, '\"').replace(/'/g, '\'').replace(/\//g, '\/').replace(/‘/g, '\‘').replace(/’/g, '\’').replace(/’/g, '\’');
 			messageData.message.text = message.text
 		}
-		if (cards) {
-			messageData.message.cards = cards.map(card => {
+		if (cardData) {
+			messageData.message.cards = cardData.cards.map(card => {
 				if (!card.description) card.description = card.resultSentence || card.sentence || card.content || card.actionSentence
 				return card
 			})
@@ -494,6 +495,7 @@ function createTextMessage(recipient, message, quickReplies, cards) {
 			messageData.message.attachment = messageAttachment
 		}
 		messageData.message.quick_replies = getQuickReplies(quickReplies, true)
+		logger.trace('messageData', messageData)
 		return messageData
 	} catch(e) {
 		logger.error(e)
@@ -779,7 +781,7 @@ const getResponseMessage = function(data) {
 	logger.log(m)
 	if (!data.messageData && m) {
 		m = prepareResult(sender, m)
-		data.messageData = [{data: createTextMessage(sender, {text: m.resultSentence || m.actionSentence || m.sentence, attachment: m.attachments && m.attachments[0] || null}, quickReplies, data.memories)}]
+		data.messageData = [{data: createTextMessage(sender, {text: m.resultSentence || m.actionSentence || m.sentence, attachment: m.attachments && m.attachments[0] || null}, quickReplies, { cards: data.memories, filters: data.requestData.filters })}]
 		if (followUp) data.messageData.push({data: followUp, delay: 2000})
 		logger.debug(data.messageData[0].data.message.cards.length)
 	}
