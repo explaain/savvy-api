@@ -362,8 +362,8 @@ function sendResponseAfterDelay(thisResponse, delay) {
         const attachment = {
           fields: [],
         }
-        if (card.fileTitle) {attachment.author_name = 'From: ' + card.fileTitle}
-        if (card.fileUrl) attachment.author_link = card.fileTitle
+        if (card.fileTitle) {attachment.author_name = (card.type === 'file' ? '' : 'From: ') + card.fileTitle}
+        if (card.fileUrl) attachment.author_link = card.fileUrl
         attachment.author_icon = getFileTypeImage(card.fileType)
         if (i === 0) {
           attachment.color = '#645AEF'
