@@ -145,9 +145,9 @@ exports.handleMessage = (teamInfo, message) => {
 			// ???
 			break
 		case 'reaction_added':
-			if (message.reaction === 'rocket')
+			if (message.reaction === 'paperclip')
 				return reactionAdded(teamInfo, message, false)
-			if (message.reaction === 'beers')
+			if (message.reaction === 'linked_paperclips')
 				return reactionAdded(teamInfo, message, true)
 		default:
 			console.log('Not a message for me! Ignoring this one.')
