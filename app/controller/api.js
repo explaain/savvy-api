@@ -288,6 +288,7 @@ const routeByIntent = function(requestData) {
 	const d = Q.defer()
   var memory = {}
   if (requestData.intent == 'setTask') requestData.intent = 'setTask.dateTime' //temporary
+  if (requestData.intent !== 'storeMemory') requestData.intent = 'query' // temporary!!
   requestData.generalIntent = getGeneralIntent(requestData.intent)
   if (requestData.generalIntent == 'write') {
     memory = getWrittenMemory(requestData)
