@@ -26,6 +26,7 @@ const Index = class Index {
   searchObjects(params) {
     logger.trace('searchObjects', params)
     const self = this
+    params.optionalWords = query
     return new Promise((resolve, reject) => {
       self.AlgoliaIndex.search(params, (err, content) => {
     		if (err) {
