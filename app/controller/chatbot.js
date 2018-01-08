@@ -128,7 +128,10 @@ exports.handleMessage = body => new Promise((resolve, reject) => {
 
 	body.entry[0].messaging.forEach(event => {
 		const sender = event.sender;
-		const context =  Object.assign(event.context || {}, { platform: event.platform } || {}) || {}
+		logger.trace(event.context)
+		logger.trace(event.platform)
+		logger.trace(event.message.extraData)
+		const context =  Object.assign({}, event.context || {}, { platform: event.platform } || {}, event.message.extraData || {})
 		logger.trace(context)
 		const postback = event.postback ? (event.postback.payload || null) : null
 		// if (event.platform) context.platform = event.platform
@@ -144,7 +147,7 @@ exports.handleMessage = body => new Promise((resolve, reject) => {
 			logger.trace()
 		} else if (event.message) {
 			if (event.message.quick_reply) {
-				firstPromise = handleQuickReplies({sender: sender}, event.message.quick_reply)
+				firstPromise = handleQuickReplies({sender: sender}, event.message.quick_reply, context)
 			}	else if ((text = event.message.text)) {
 				// Handle a text message from this sender
 				// const extraData = event.message.attachments ? { attachments: event.message.attachments } : null
@@ -163,6 +166,7 @@ exports.handleMessage = body => new Promise((resolve, reject) => {
 		.then(function(res) {
 			const responseMessage = res ? getResponseMessage(res) : null
 			if (res && res.memories) { // Not sure if this is the right condition?
+				logger.trace('Setting lastAction context')
 				setContext(sender, 'lastAction', res)
 			}
 			if (responseMessage) responseMessage.messageData.push.apply(responseMessage.messageData, onboardingCheck(sender, res.requestData.intent))
@@ -250,12 +254,13 @@ const handlePostbacks = (requestData, payload) => new Promise((resolve, reject) 
 	}
 })
 
-const handleQuickReplies = function(requestData, quickReply) {
-	logger.trace(handleQuickReplies)
+const handleQuickReplies = function(requestData, quickReply, extraData) {
+	logger.trace(handleQuickReplies, requestData, quickReply, extraData)
 	const d = Q.defer()
 	const sender = requestData.sender
 	const quickReplyCode = quickReply.payload.split('-data-')[0]
-	const quickReplyData = quickReply.payload.split('-data-')[1]
+	const quickReplyData = extraData || quickReply.payload.split('-data-')[1]
+	logger.trace(quickReplyData)
 	switch (quickReplyCode) {
 		case "USER_FEEDBACK_MIDDLE":
 			var messageData = sendCorrectionMessage(sender)
@@ -299,11 +304,33 @@ const handleQuickReplies = function(requestData, quickReply) {
 		case "REQUEST_MORE_RESULTS":
 			var data = getContext(sender, 'lastAction')
 			data.requestData.moreResults = true // This should be generalised
+			data.requestData.sender.platformSpecific = sender
+			logger.trace(data.requestData)
 			delete data.messageData
+			setContext(sender, 'lastAction', data)
 			d.resolve(data)
+			break;
 
-			var messageData = createTextMessage(sender, "Sure thing - type your message below and I'll attach it...")
-			d.resolve({requestData: requestData, messageData: [{data: messageData}]})
+		case "FILTER_RESULTS":
+			// var data = getContext(sender, 'lastAction')
+			// logger.trace(data)
+			// data.requestData.filters[quickReplyData.filter] = quickReplyData.value
+			// delete data.memories
+			// delete data.messageData
+			// logger.trace(data)
+			logger.trace(extraData)
+			logger.trace(quickReplyData)
+			// const extraData = {
+			// 	filters: {}
+			// }
+			// extraData.filters[quickReplyData.filter] = quickReplyData.value
+			intentConfidence(sender, getContext(sender, 'lastAction').requestData.resolvedQuery, extraData)
+			.then(function(res) {
+				d.resolve(res)
+			}).catch(function(e) {
+				logger.error(e)
+				d.reject(e)
+			})
 			break;
 
 		case "CORRECTION_ADD_ATTACHMENT":
@@ -459,7 +486,7 @@ const createMessagePromise = function(requestData, messageData) {
 
 
 function createTextMessage(recipient, message, quickReplies, cardData) {
-	logger.trace(createTextMessage, recipient, message, quickReplies)
+	logger.trace(createTextMessage, recipient, message, quickReplies, cardData)
 	try {
 
 		if (typeof message === 'string') {
@@ -468,7 +495,7 @@ function createTextMessage(recipient, message, quickReplies, cardData) {
 		const messageData = {
 			recipient: recipient,
 			message: {},
-			filters: cardData.filters
+			filters: (cardData ? cardData.filters : {}) || {}
 		};
 		if (message.text) {
 			message.text = message.text.replace(/"/g, '\"').replace(/'/g, '\'').replace(/\//g, '\/').replace(/‘/g, '\‘').replace(/’/g, '\’').replace(/’/g, '\’');
@@ -700,14 +727,14 @@ const getResponseMessage = function(data) {
 						// @TODO: Send carousel
 					} else if (data.memories.length - (data.requestData.hitNum || 0) > 0) {
 						m = data.memories[(data.requestData.hitNum || 0)]
-						m.resultSentence = m.sentence;
+						m.resultSentence = 'Here\'s what I found:' // m.sentence;
 					} else {
-						data.messageData = [{data: createTextMessage(sender, {text: 'Sorry I couldn\'t find any memories related to that!'})}]
+						data.messageData = [{data: createTextMessage(sender, {text: 'Sorry I couldn\'t find any results related to that!'})}]
 					}
 					break;
 
 				case 'storeMemory':
-					m.resultSentence = "I've now remembered that for you! " + (m.title ? m.title + '\n\n' : '') + m.sentence;
+					m.resultSentence = "I've now remembered that for you!" // + (m.title ? m.title + '\n\n' : '') + m.sentence;
 					break;
 
 				case 'setTask.URL':
@@ -826,14 +853,14 @@ const getCarousel = function(sender, memories) {
 function prepareResult(sender, memory) {
 	logger.trace(prepareResult);
 	var sentence = memory.resultSentence || memory.sentence;
-	if (memory.listCards) {
-		sentence += '\n\n- ' + memory.listCards.join('\n- ')
-		// sentence += '\n\n' + memory.listItems.map(function(key) {
-		// 	const card = memory.listCards[key]
-		// 	const text = card.sentence
-		// 	return getEmojis(text, card.entities, 1, true) + ' ' + text
-		// }).join('\n')
-	}
+	// if (memory.listCards) {
+	// 	sentence += '\n\n- ' + memory.listCards.join('\n- ')
+	// 	// sentence += '\n\n' + memory.listItems.map(function(key) {
+	// 	// 	const card = memory.listCards[key]
+	// 	// 	const text = card.sentence
+	// 	// 	return getEmojis(text, card.entities, 1, true) + ' ' + text
+	// 	// }).join('\n')
+	// }
 	if (memory.attachments) {
 		if (~[".","!","?",";"].indexOf(sentence[sentence.length-1])) sentence = sentence.substring(0, sentence.length - 1);;
 		sentence+=" ⬇️";

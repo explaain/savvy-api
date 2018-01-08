@@ -135,12 +135,18 @@ exports.handleMessage = (teamInfo, message) => {
 	// * Get rid of unwanted addressing (e.g. @forgetmenot)
 	message = transformMessage(teamInfo, message)
 
+  logger.trace(message)
+  logger.trace(message.type)
+  logger.trace(message.type === 'reaction_added')
+
+
 	switch (message.type) {
 		case 'message':
 			// Respond only when the bot's involved
 			// But not if it's the bot posting.
  			if (message.subtype !== 'message_deleted' && (!message.text || message.formsOfAddress.test(message.text)) && !message.bot_id)
 				return messageReceived(message)
+      break
 		case 'quick_reply': // ???
 			// ???
 			break
@@ -149,6 +155,7 @@ exports.handleMessage = (teamInfo, message) => {
 				return reactionAdded(teamInfo, message, false)
 			if (message.reaction === 'linked_paperclips')
 				return reactionAdded(teamInfo, message, true)
+      break
 		default:
 			console.log('Not a message for me! Ignoring this one.')
 			return new Promise((resolve, reject) => { resolve() })
@@ -173,8 +180,6 @@ const messageReceived = message => {
 }
 
 const reactionAdded = async (teamInfo, message, includeTitle) => {
-	// Get message ID
-	const messageID = message.item.ts
 	// Get message data
 	const messageSpecs = {
 		team: teamInfo.team,
@@ -210,6 +215,7 @@ const packageAndHandleMessage = (message, context) => new Promise((resolve, reje
 		messagePackage.entry[0].messaging[0].message.quick_reply = {
 			payload: message.quick_reply
 		}
+    if (message.data) messagePackage.entry[0].messaging[0].message.extraData = message.data
 	}
 
 	messagePackage.entry[0].messaging[0].context = context
@@ -357,7 +363,7 @@ function sendResponseAfterDelay(thisResponse, delay) {
 
 
     if (thisResponse.message.cards && thisResponse.message.cards.length) {
-      thisResponse.message.text = 'Here\'s what I found:'
+      // thisResponse.message.text = 'Here\'s what I found:'
       thisResponse.message.cards.forEach((card, i) => {
         const attachment = {
           fields: [],
@@ -387,24 +393,49 @@ function sendResponseAfterDelay(thisResponse, delay) {
         }
       })
       delete thisResponse.message.cards
-      if (!thisResponse.message.moreResults) {
-        params.attachments.push({
-          title: thisResponse.filters && thisResponse.filters.type && thisResponse.filters.type !== 'all' ? 'Returning only: ' + ({ file: 'Files', p: 'Content from Files', manual: 'Manually Created Content' }[thisResponse.filters.type]) : 'Returning all types of content',
-          fallback: "Oops, you can't ask for more",
-          callback_id: 'results-options', // Specify who the bot is going to speak on behalf of, and where.
-          color: "#645AEF",
-          attachment_type: "default",
-          actions: [
+      const actions = [
+        {
+          type: 'select',
+          name: 'filter-type',
+          style: 'primary',
+          text: thisResponse.filters && thisResponse.filters.type && thisResponse.filters.type !== 'all' ? 'Returning only: ' + ({ file: 'Files', p: 'Content from Files', manual: 'Manually Created Content' }[thisResponse.filters.type]) : 'All types of content',
+          options: [
             {
-              type: 'button',
-              name: 'results',
-              style: 'primary',
-              text: 'Give me more results',
-              value: 'more-results',
-            }
+              "text": "All types of content",
+              "value": "all"
+            },
+            {
+              "text": "Only return Files",
+              "value": "file"
+            },
+            {
+              "text": "Only return Content from Files",
+              "value": "p"
+            },
+            {
+              "text": "Only return Content Created Manually",
+              "value": "manual"
+            },
           ]
+        },
+      ]
+      if (!thisResponse.message.moreResults) {
+        actions.unshift({
+          type: 'button',
+          name: 'results',
+          style: 'primary',
+          text: 'Give me more results',
+          value: 'more-results',
         })
       }
+      params.attachments.push({
+        title: thisResponse.filters && thisResponse.filters.type && thisResponse.filters.type !== 'all' ? 'Returning only: ' + ({ file: 'Files', p: 'Content from Files', manual: 'Manually Created Content' }[thisResponse.filters.type]) : 'Returning all types of content',
+        fallback: "Oops, you can't ask for more",
+        callback_id: 'results-options', // Specify who the bot is going to speak on behalf of, and where.
+        color: "#645AEF",
+        attachment_type: "default",
+        actions: actions
+      })
 
   		params.attachments.push({
   			"footer": "Quick actions",
@@ -438,10 +469,11 @@ function sendResponseAfterDelay(thisResponse, delay) {
       params: params
 			// params: params
 		}
+    if (thisResponse.recipient.platformSpecific.ts) messageData.ts = thisResponse.recipient.platformSpecific.ts
     console.log(JSON.stringify(messageData))
 		logger.trace('messageData', messageData)
 		sendClientMessage({
-			action: 'sendMessage',
+			action: messageData.ts ? 'updateMessage' : 'sendMessage',
 			data: messageData
 		}).then(x => {
       console.log(messageData);
@@ -501,7 +533,7 @@ const reactionButtonPressed = action => new Promise((resolve, reject) => {
   logger.trace(action.original_message);
   noBtnMessage.attachments.forEach((attachment, i) => {
     if (attachment.callback_id === 'reaction-buttons')
-    noBtnMessage.attachments[i] = { footer: 'Thanks for your feedback!' }
+      noBtnMessage.attachments[i] = { footer: 'Thanks for your feedback!' }
   })
   noBtnMessage.params = {
     attachments: noBtnMessage.attachments
@@ -548,15 +580,37 @@ const reactionButtonPressed = action => new Promise((resolve, reject) => {
 })
 
 const resultsOptionsPressed = action => {
-  if (action.actions[0].value === 'more-results') {
-    return packageAndHandleMessage({
-      quick_reply: 'REQUEST_MORE_RESULTS',
-      sender: {
-        team: action.team.id,
-        channel: action.channel.id,
-        user: action.user.id,
+  logger.trace(resultsOptionsPressed, action)
+  switch (action.actions[0].name) {
+    case 'results':
+      if (action.actions[0].value === 'more-results') {
+        return packageAndHandleMessage({
+          quick_reply: 'REQUEST_MORE_RESULTS',
+          sender: {
+            team: action.team.id,
+            channel: action.channel.id,
+            user: action.user.id,
+            ts: action.message_ts
+          }
+        })
       }
-    })
+      break
+    case 'filter-type':
+      return packageAndHandleMessage({
+        quick_reply: 'FILTER_RESULTS',
+        data: {
+          filters: {
+            type: action.actions[0].selected_options[0].value
+          },
+        },
+        sender: {
+          team: action.team.id,
+          channel: action.channel.id,
+          user: action.user.id,
+          ts: action.message_ts
+        }
+      })
+      break
   }
 }
 

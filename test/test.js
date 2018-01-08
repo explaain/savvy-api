@@ -1455,6 +1455,38 @@ describe('Bulk', function() {
         })
       })
     })
+    describe('Manually filter to just files', function() {
+      var result
+      before(async () => {
+        await sendSlackMessage('What\'s the Savvy colour?')
+        result = await slack.interactive(JSON.parse( '{"type":"interactive_message","actions":[{"name":"filter-type","type":"button","selected_options":[{"value":"file", "text":"Give me just file results"}]}],"callback_id":"results-options","team":{"id":"T04NVHJBK","domain":"explaain"},"channel":{"id":"C7BQBL138","name":"bot-testing"},"user":{"id":"U04NVHJFD","name":"jeremy"},"action_ts":"1515101782.306526","message_ts":"1514506085.000191","attachment_id":"1","token":"Yrn00Mm2UXAMpEGrSc5GYTpF","is_app_unfurl":false,"original_message":{"text":"Here\'s what I '
+          + 'found:","username":"ForgetMeNot_local","bot_id":"B7DRNAZ0Q","attachments":[{"callback_id":"vZweCaZEWlZPx0gpQn2b1B7DFAZ2","fallback":"Oops, you can\'t quick-reply","footer":"Quick'
+          + 'actions","id":1,"color":"FED33C","actions":[{"id":"1","name":"USER_FEEDBACK_TOP","text":"\\ud83d\\ude0d","type":"button","value":"\\ud83d\\ude0d","style":""},{"id":"2","name":"USER_FEEDBACK_MIDDLE","text":"\\u270f\\ufe0f","type":"button","value":"\\u270f\\ufe0f","style":""},{"id":"3","name":"USER_FEEDBACK_BOTTOM","text":"\\ud83d\\ude14","type":"button","value":"\\ud83d\\ude14","style":""}]},{"author_name":"From: Savvy 1 pager - Generic","title":"What is Savvy?\\n\\n- Savvy is an app'
+          + 'that lives where you work. It works on its own website, via a browser extension and Slack. It connects to the tools you use at work, like Google Drive, Dropbox, Trello and more, and allows you to find the answers to the questions you have wherever you are.\\n- You interact with it in natural language. You can ask it questions like, \\u201cwhere are the latest financial projections\\u201d or \\u201cwhat\\u2019s our holiday policy?\\u201d It\\u2019ll return links to the best files and'
+          + 'documents to answer your question.","id":2,"color":"645AEF","fallback":"What is Savvy?\\n\\n- Savvy is an app that lives where you work. It works on its own website, via a browser extension and Slack. It connects to the tools you use at work, like Google Drive, Dropbox, Trello and more, and allows you to find the answers to the questions you have wherever you are.\\n- You interact with it in natural language. You can ask it questions like, \\u201cwhere are the latest financial'
+          + 'projections\\u201d or \\u201cwhat\\u2019s our holiday policy?\\u201d It\\u2019ll return links to the best files and documents to answer your question."},{"id":3,"fields":[{"title":"Created","value":"Tue Oct 31 2017","short":true},{"title":"Modified","value":"Fri Dec 01 2017","short":true}],"fallback":"[no preview available]"},{"author_name":"From: Savvy For Publishers","text":"What is Savvy?","id":4,"fallback":"What is Savvy?"},{"author_name":"From: Savvy 1 pager -'
+          + 'Generic","text":"You interact with it in natural language. You can ask it questions like, \\u201cwhere are the latest financial projections\\u201d or \\u201cwhat\\u2019s our holiday policy?\\u201d It\\u2019ll return links to the best files and documents to answer your question.","id":5,"fallback":"You interact with it in natural language. You can ask it questions like, \\u201cwhere are the latest financial projections\\u201d or \\u201cwhat\\u2019s our holiday policy?\\u201d'
+          + 'It\\u2019ll return links to the best files and documents to answer your question."}],"type":"message","subtype":"bot_message","ts":"1514506085.000191"},"response_url":"https:\\/\\/hooks.slack.com\\/actions\\/T04NVHJBK\\/294374436274\\/f9EO0Mo8HKwbA65D7gV1RKND","trigger_id":"294405711476.4777596393.887022949ae4a6b337c02f1a794a3beb"}'
+        ))
+        return result
+      })
+      it('should return a text message', () => {
+        logger.debug(result)
+        assert(result[0].text)
+      })
+      it('should have the same message id as the previous one', () => {
+        assert(result[0].text)
+      })
+      it('should return an answer', () => {
+        assert.equal(result[0].text, 'Here\'s what I found:')
+      })
+      it('should return only files', () => {
+        logger.debug(result[0].params.attachments)
+        result[0].params.attachments.filter(attachment => attachment.author_name).forEach(attachment => {
+          assert.notEqual(attachment.author_name.indexOf('From: '), 0)
+        })
+      })
+    })
     describe('Store the company address', function() {
       var result
       before(async () => {
@@ -1471,7 +1503,7 @@ describe('Bulk', function() {
     describe('Store by reacting to a previous message', function() {
       var result
       before(async () => {
-        result = await sendSlackReaction('rocket')
+        result = await sendSlackReaction('paperclip')
         return
       })
       it('should return a text message', () => {
@@ -1484,7 +1516,7 @@ describe('Bulk', function() {
     describe('Store (plus title) by reacting to a previous message', function() {
       var result
       before(async () => {
-        result = await sendSlackReaction('beers')
+        result = await sendSlackReaction('linked_paperclips')
         return
       })
       it('should return a text message', () => {
@@ -1510,6 +1542,7 @@ describe('Bulk', function() {
         return result
       })
       it('should return a text message', () => {
+        logger.debug(result[0])
         assert(result[0].text)
       })
       it('should return confirmation', () => {

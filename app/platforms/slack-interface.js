@@ -1,5 +1,5 @@
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'debug'})
+const logger = tracer.colorConsole({level: 'trace'})
 const request = require('request')
 const SlackBot = require('slackbots')
 const RtmClient = require('@slack/client').RtmClient
@@ -89,7 +89,6 @@ exports.oauth = function(req, res) {
       } else {
 				logger.trace("🤓 Bot was authorised", slackKeychain)
 
-				// TODO: Store this token in an encrypted DB so we can bootstrap bots after server restart
         const teamID = slackKeychain.team_id
         const org = {
           objectID: teamID,
@@ -172,10 +171,10 @@ exports.interactive = function(req, res) {
 
 	var action = JSON.parse(req.body.payload)
 
+  res.sendStatus(200)
   slack.interactive(action)
-  .then(result => {
-    res.sendStatus(200)
-  })
+  // .then(result => {
+  // })
 }
 
 

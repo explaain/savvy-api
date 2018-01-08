@@ -12,7 +12,7 @@
 
 
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'debug'})
+const logger = tracer.colorConsole({level: 'trace'})
 // tracer.setLevel('warn');
 const sinon = require('sinon')
 const Q = require("q")
@@ -486,15 +486,17 @@ const recallMemory = function(requestData) {
 		const readAccessList = userData.readAccess || []
     /* Temporarily allowing everything to search ACME userID */ readAccessList[readAccessList.length] = '101118387301286232222'
 		const userIdFilterString = 'userID: ' + requestData.sender.uid + readAccessList.map(function(id) {return ' OR userID: '+id}).join('');
+    const query = searchTerm.toLowerCase().replace(requestData.parameters.extraContext || '', '').substring(0, 500).trim() // Only sends Algolia the first 511 characters as it can't hanlogger.tracee more than that
+    logger.trace(query)
 		const searchParams = {
-			query: searchTerm.substring(0, 500), // Only sends Algolia the first 511 characters as it can't hanlogger.tracee more than that
+			query: query,
 			// filters: userIdFilterString,
       hitsPerPage: 10,
 			// filters: (attachments ? 'hasAttachments: true' : '')
 		};
-    requestData.filters = {
-      type: requestData.parameters.preferredCardType
-    }
+    if (!requestData.filters) requestData.filters = {}
+    if (!requestData.filters.type) requestData.filters.type = requestData.parameters.preferredCardType
+
     if (requestData.filters.type && requestData.filters.type.length && requestData.filters.type !== 'all')
       searchParams.filters = 'type: "' + requestData.filters.type + '"'
     logger.trace(searchParams)
