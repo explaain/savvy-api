@@ -391,6 +391,7 @@ function sendResponseAfterDelay(thisResponse, delay) {
           params.attachments.push({ fields: fields })
         } else if (i < 5 && thisResponse.message.moreResults) {
           attachment.text = (card.sentence && card.sentence !== undefined) ? card.sentence : card.title
+          attachment.color = '#645AEF'
           params.attachments.push(attachment)
         }
       })
@@ -440,7 +441,7 @@ function sendResponseAfterDelay(thisResponse, delay) {
         title: thisResponse.filters && thisResponse.filters.type && thisResponse.filters.type !== 'all' ? 'Returning only: ' + ({ file: 'Files', p: 'Content from Files', manual: 'Manually Created Content' }[thisResponse.filters.type]) : 'Returning all types of content',
         fallback: "Oops, you can't ask for more",
         callback_id: 'results-options', // Specify who the bot is going to speak on behalf of, and where.
-        color: "#645AEF",
+        // color: "#645AEF",
         attachment_type: "default",
         actions: actions
       })
@@ -530,6 +531,8 @@ exports.dropdown = function() {
 
 
 const successButtonPressed = action => new Promise((resolve, reject) => {
+  logger.trace(action)
+  logger.trace(JSON.stringify(action))
   // Define this specific message sender as part of the conversational chain
   // Even if the bot itself is speaking on behalf of the user
   // var alias = `On behalf of ${action.channel.id.charAt(0) === 'D' ? action.user.name : "#"+action.channel.name}`
@@ -567,17 +570,28 @@ const successButtonPressed = action => new Promise((resolve, reject) => {
   })
 
   // 2. Send event to mixpanel
-  // track.event('Result Success!', {
-  //   organisationID: user.organisationID,
-  //   messageID: action.message_ts,
-  //   channelID: action.channel.id,
-  //   teamID: action.team.id,
-  //   userID: user.uid,
-  //   searchQuery: params.query,
-  //   results: content.hits,
-  //   noOfResults: content.hits.length,
-  //   searchParams: params
-  // })
+  track.event('Result Success!', {
+    // organisationID: user.organisationID,
+    messageID: action.message_ts,
+    userID: action.user.id,
+    userName: action.user.name,
+    channelID: action.channel.id,
+    channelName: action.channel.name,
+    teamID: action.team.id,
+    teamName: action.team.domain,
+    // userID: user.uid,
+    // searchQuery: params.query,
+    results: action.original_message.attachments.filter(attachment => ((attachment.title || attachment.text) && !attachment.actions)).map(attachment => {
+      return {
+        content: attachment.title || attachment.text,
+        fileTitle: attachment.author_name,
+        fileUrl: attachment.author_link
+      }
+    }),
+    noOfResultsShown: action.original_message.attachments.length - 2
+    // noOfResults: content.hits.length,
+    // searchParams: params
+  })
 
   // // 2. Post reply to slack on behalf of user
   // const messageData = {
