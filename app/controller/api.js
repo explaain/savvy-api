@@ -12,7 +12,7 @@
 
 
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'trace'})
+const logger = tracer.colorConsole({level: 'debug'})
 // tracer.setLevel('warn');
 const sinon = require('sinon')
 const Q = require("q")
@@ -288,7 +288,7 @@ const routeByIntent = function(requestData) {
 	const d = Q.defer()
   var memory = {}
   if (requestData.intent == 'setTask') requestData.intent = 'setTask.dateTime' //temporary
-  if (requestData.intent !== 'storeMemory') requestData.intent = 'query' // temporary!!
+  if (['setTask', 'setTask.dateTime', 'setTask.URL', 'provideURL', 'provideDateTime'].indexOf(requestData.intent) > -1) requestData.intent = 'storeMemory' // temporary!!
   requestData.generalIntent = getGeneralIntent(requestData.intent)
   if (requestData.generalIntent == 'write') {
     memory = getWrittenMemory(requestData)
@@ -500,7 +500,7 @@ const recallMemory = function(requestData) {
     if (requestData.filters.type && requestData.filters.type.length && requestData.filters.type !== 'all')
       searchParams.filters = 'type: "' + requestData.filters.type + '"'
     logger.trace(searchParams)
-    return searchForCards(requestData.sender.algoliaApiKey, requestData.sender.organisationID, searchParams)
+    return searchForCards(requestData.sender, searchParams)
 	}).then(function(content) {
 		if (!content.hits.length) {
       logger.trace('No results found')
@@ -588,13 +588,21 @@ const saveMemory = function(m, requestData) {
 }
 
 
-const searchForCards = async function(apiKey, organisationID, params) {
-  logger.trace(searchForCards, apiKey, organisationID, params)
+const searchForCards = async function(user, params) {
+  logger.trace(searchForCards, user, params)
   try {
-    const index = organisationID + '__Cards'
-    const content = await Algolia.connect(AlgoliaParams.appID, apiKey, index).searchObjects(params)
+    const index = user.organisationID + '__Cards'
+    const content = await Algolia.connect(AlgoliaParams.appID, user.algoliaApiKey, index).searchObjects(params)
     // const itemCards = await fetchListItemCards(apiKey, index, content.hits) // What do we do with itemCards here?!
     logger.trace('Search Results:', content)
+    track.event('Searched', {
+      organisationID: user.organisationID,
+      userID: user.uid,
+      searchQuery: params.query,
+      results: content.hits,
+      noOfResults: content.hits.length,
+      searchParams: params
+    })
     return content
   } catch (e) {
     logger.error(e)
@@ -622,7 +630,7 @@ const saveToDb = function(user, card, requestData) {
   .then(function(response) {
     logger.trace('📪  The response!', response)
     if (!data.objectID) data.objectID = response.objectID
-    track.event('Card Created', {
+    track.event('Card Saved', {
       organisationID: data.organisationID,
       userID: data.userID,
       card: data

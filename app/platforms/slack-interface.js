@@ -105,7 +105,7 @@ exports.oauth = function(req, res) {
           org.slack.domain = teamInfo.domain
           setOrg(teamID, org)
         }).then(result => {
-          initateSlackBot(org.slack)
+          initateSlackBot(org.slack, { userID: slackKeychain.user_id })
           res.redirect(`https://${org.slack.domain}.slack.com/`)
         }).catch(e => {
           logger.error(e)
@@ -118,12 +118,12 @@ exports.oauth = function(req, res) {
 
 
 
-const initateSlackBot = async slackTeam => {
+const initateSlackBot = async (slackTeam, onboarding) => {
 	logger.trace(initateSlackBot, slackTeam)
 
 	// create a bot
-	bot = new SlackBot({ token: slackTeam.__botAccessToken })
-	rtm = new RtmClient(slackTeam.__botAccessToken)
+	const bot = new SlackBot({ token: slackTeam.__botAccessToken })
+	const rtm = new RtmClient(slackTeam.__botAccessToken)
 	rtm.start()
 
   try {
@@ -140,6 +140,8 @@ const initateSlackBot = async slackTeam => {
 
 	logger.info('New Slackbot connecting.')
 
+  logger.debug(bot)
+
 	bot.on('open', () => logger.info("Slackbot opened websocket."))
 	bot.on('errror', () => logger.info("Slackbot 👺 ERR'D OUT while connecting."))
 	bot.on('close', () => logger.info("Slackbot 👺 CLOSED a websocket."))
@@ -147,10 +149,9 @@ const initateSlackBot = async slackTeam => {
 	bot.on('start', () => {
 		logger.info('Slackbot has 🙏 connected to team ' + slackTeam.name)
 
-		// // TODO: Remove after debug
-    // bot.postMessageToChannel('bot-testing', `*I'm your personal mind-palace. Invite me to this channel and ask me to remember things :)*`, {
-    //     icon_emoji: ':sparkles:'
-    // });
+    // if (onboarding) {
+    //   bot.postMessage(onboarding.userID, `Hello! Welcome to Savvy :)`)
+    // }
 	})
 
 	bot.on('message', (message) => {

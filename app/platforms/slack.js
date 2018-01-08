@@ -8,7 +8,7 @@ const chatbotController = require('../controller/chatbot')
 const properties = require('../config/properties.js')
 
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'trace'})
+const logger = tracer.colorConsole({level: 'debug'})
 // const debug = true
 // const logger = debug ? tracer.colorConsole({level: 'debug'}) : {trace:()=>{},log:()=>{}}
 // tracer.setLevel('error')
@@ -365,6 +365,7 @@ function sendResponseAfterDelay(thisResponse, delay) {
     if (thisResponse.message.cards && thisResponse.message.cards.length) {
       // thisResponse.message.text = 'Here\'s what I found:'
       thisResponse.message.cards.forEach((card, i) => {
+        card.sentence = card.description + (card.listCards && card.listCards.length ? '\n\n- ' + card.listCards.join('\n- ') : '')
         const attachment = {
           fields: [],
         }
@@ -373,7 +374,7 @@ function sendResponseAfterDelay(thisResponse, delay) {
         attachment.author_icon = getFileTypeImage(card.fileType)
         if (i === 0) {
           attachment.color = '#645AEF'
-          attachment.title = card.description || card.title
+          attachment.title = card.sentence || card.title
           const fields = []
           if (card.created) fields.push({
             title: 'Created',
@@ -388,7 +389,7 @@ function sendResponseAfterDelay(thisResponse, delay) {
           params.attachments.push(attachment)
           params.attachments.push({ fields: fields })
         } else if (i < 5 && thisResponse.message.moreResults) {
-          attachment.text = card.description || card.title
+          attachment.text = card.sentence || card.title
           params.attachments.push(attachment)
         }
       })

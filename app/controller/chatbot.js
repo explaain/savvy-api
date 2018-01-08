@@ -22,7 +22,7 @@ const Randoms = require('../controller/cannedResponses.js').Randoms
 
 
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'trace'});
+const logger = tracer.colorConsole({level: 'debug'});
 // tracer.setLevel('error');
 
 const C = {}; // C is for Context
@@ -503,7 +503,7 @@ function createTextMessage(recipient, message, quickReplies, cardData) {
 		}
 		if (cardData) {
 			messageData.message.cards = cardData.cards.map(card => {
-				if (!card.description) card.description = card.resultSentence || card.sentence || card.content || card.actionSentence
+				if (!card.description) card.description = /*card.resultSentence ||*/ card.sentence || card.content || card.actionSentence
 				return card
 			})
 		}
@@ -807,7 +807,7 @@ const getResponseMessage = function(data) {
 	}
 	logger.log(m)
 	if (!data.messageData && m) {
-		m = prepareResult(sender, m)
+		// m = prepareResult(sender, m)
 		data.messageData = [{data: createTextMessage(sender, {text: m.resultSentence || m.actionSentence || m.sentence, attachment: m.attachments && m.attachments[0] || null}, quickReplies, { cards: data.memories, filters: data.requestData.filters })}]
 		if (followUp) data.messageData.push({data: followUp, delay: 2000})
 		logger.debug(data.messageData[0].data.message.cards.length)
@@ -852,21 +852,21 @@ const getCarousel = function(sender, memories) {
 
 function prepareResult(sender, memory) {
 	logger.trace(prepareResult);
-	var sentence = memory.resultSentence || memory.sentence;
-	// if (memory.listCards) {
-	// 	sentence += '\n\n- ' + memory.listCards.join('\n- ')
-	// 	// sentence += '\n\n' + memory.listItems.map(function(key) {
-	// 	// 	const card = memory.listCards[key]
-	// 	// 	const text = card.sentence
-	// 	// 	return getEmojis(text, card.entities, 1, true) + ' ' + text
-	// 	// }).join('\n')
-	// }
+	var sentence = memory.sentence;
+	if (memory.listCards) {
+		sentence += '\n\n- ' + memory.listCards.join('\n- ')
+		// sentence += '\n\n' + memory.listItems.map(function(key) {
+		// 	const card = memory.listCards[key]
+		// 	const text = card.sentence
+		// 	return getEmojis(text, card.entities, 1, true) + ' ' + text
+		// }).join('\n')
+	}
 	if (memory.attachments) {
 		if (~[".","!","?",";"].indexOf(sentence[sentence.length-1])) sentence = sentence.substring(0, sentence.length - 1);;
 		sentence+=" ⬇️";
 		// sendAttachmentMessage(sender, memory.attachments[0])
 	}
-	memory.resultSentence = sentence
+	memory.sentence = sentence
 	return memory
 }
 
