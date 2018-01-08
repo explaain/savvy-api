@@ -22,7 +22,7 @@ const Randoms = require('../controller/cannedResponses.js').Randoms
 
 
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'debug'});
+const logger = tracer.colorConsole({level: 'trace'});
 // tracer.setLevel('error');
 
 const C = {}; // C is for Context
@@ -716,7 +716,7 @@ const getResponseMessage = function(data) {
 	switch (data.statusCode) {
 		case 200:
 			logger.trace('m', m)
-			if (m && !m.sentence) m.sentence = m.description || m.content
+			if (m && !m.sentence) m.sentence = m.description || m.content || m.title
 			logger.trace('m', m)
 
 			switch (intent) {

@@ -217,6 +217,7 @@ const setTyping = async (team, channel, on) => {
 
 const sendMessage = async messageData => {
   logger.trace(sendMessage, messageData)
+  logger.trace(JSON.stringify(messageData))
   const bot = await getBot(messageData.teamID)
   return bot.postMessage(
 		// reaction.channel.id.charAt(0) === 'D' ? reaction.user.id : reaction.channel.id, // Identify by user OR by group
@@ -248,10 +249,13 @@ const updateMessage = async messageData => {
  * @param  {String} messageSpecs.channel
  * @return {Object}
  */
-const getMessageData = async (teamID, messageSpecs) => {
-  logger.trace(getMessageData, teamID, messageSpecs)
-  const web = await getWeb(teamID)
+const getMessageData = async (messageSpecs) => {
+  logger.trace(getMessageData, messageSpecs)
+  const web = await getWeb(messageSpecs.team)
+  logger.trace(web)
+  logger.trace(messageSpecs)
   const res = await web.channels.history(messageSpecs.channel, { latest: messageSpecs.ts, count: messageSpecs.count || 1, inclusive: true })
+  logger.trace(res)
   if (res.ok && res.messages && res.messages.length) {
     const messageData = res.messages
     messageData.forEach(m => m.channel = messageSpecs.channel)

@@ -4,11 +4,12 @@ const crypto = require("crypto")
 const Q = require("q")
 const sinon = require('sinon')
 
+const track = require('../controller/track')
 const chatbotController = require('../controller/chatbot')
 const properties = require('../config/properties.js')
 
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'debug'})
+const logger = tracer.colorConsole({level: 'trace'})
 // const debug = true
 // const logger = debug ? tracer.colorConsole({level: 'debug'}) : {trace:()=>{},log:()=>{}}
 // tracer.setLevel('error')
@@ -182,7 +183,7 @@ const messageReceived = message => {
 const reactionAdded = async (teamInfo, message, includeTitle) => {
 	// Get message data
 	const messageSpecs = {
-		team: teamInfo.team,
+		team: teamInfo.teamID,
 		channel: message.item.channel,
 		ts: message.item.ts,
 		count: includeTitle ? 2 : 1
@@ -374,7 +375,7 @@ function sendResponseAfterDelay(thisResponse, delay) {
         attachment.author_icon = getFileTypeImage(card.fileType)
         if (i === 0) {
           attachment.color = '#645AEF'
-          attachment.title = card.sentence || card.title
+          attachment.title = (card.sentence && card.sentence !== undefined) ? card.sentence : card.title
           const fields = []
           if (card.created) fields.push({
             title: 'Created',
@@ -389,7 +390,7 @@ function sendResponseAfterDelay(thisResponse, delay) {
           params.attachments.push(attachment)
           params.attachments.push({ fields: fields })
         } else if (i < 5 && thisResponse.message.moreResults) {
-          attachment.text = card.sentence || card.title
+          attachment.text = (card.sentence && card.sentence !== undefined) ? card.sentence : card.title
           params.attachments.push(attachment)
         }
       })
@@ -424,11 +425,17 @@ function sendResponseAfterDelay(thisResponse, delay) {
         actions.unshift({
           type: 'button',
           name: 'results',
-          style: 'primary',
           text: 'Give me more results',
           value: 'more-results',
         })
       }
+      actions.unshift({
+        type: 'button',
+        name: 'success',
+        style: 'primary',
+        text: '😍 That\'s what I needed',
+        value: 'success'
+      })
       params.attachments.push({
         title: thisResponse.filters && thisResponse.filters.type && thisResponse.filters.type !== 'all' ? 'Returning only: ' + ({ file: 'Files', p: 'Content from Files', manual: 'Manually Created Content' }[thisResponse.filters.type]) : 'Returning all types of content',
         fallback: "Oops, you can't ask for more",
@@ -438,23 +445,23 @@ function sendResponseAfterDelay(thisResponse, delay) {
         actions: actions
       })
 
-  		params.attachments.push({
-  			"footer": "Quick actions",
-  			"fallback": "Oops, you can't quick-reply",
-  			"callback_id": 'reaction-buttons', // Specify who the bot is going to speak on behalf of, and where.
-        "color": "#FED33C",
-        "attachment_type": "default",
-  			"actions": []
-      })
-
-  		thisResponse.message.quick_replies.forEach(reply => {
-  			params.attachments[params.attachments.length-1].actions.push({
-  				"type": "button",
-  				"name": reply.payload,
-  				"text": reply.title,
-  				"value": reply.title
-  			})
-  		})
+  		// params.attachments.push({
+  		// 	"footer": "Quick actions",
+  		// 	"fallback": "Oops, you can't quick-reply",
+  		// 	"callback_id": 'reaction-buttons', // Specify who the bot is going to speak on behalf of, and where.
+      //   "color": "#FED33C",
+      //   "attachment_type": "default",
+  		// 	"actions": []
+      // })
+      //
+  		// thisResponse.message.quick_replies.forEach(reply => {
+  		// 	params.attachments[params.attachments.length-1].actions.push({
+  		// 		"type": "button",
+  		// 		"name": reply.payload,
+  		// 		"text": reply.title,
+  		// 		"value": reply.title
+  		// 	})
+  		// })
     }
   } catch(e) {
     logger.error(e)
@@ -522,7 +529,7 @@ exports.dropdown = function() {
 }
 
 
-const reactionButtonPressed = action => new Promise((resolve, reject) => {
+const successButtonPressed = action => new Promise((resolve, reject) => {
   // Define this specific message sender as part of the conversational chain
   // Even if the bot itself is speaking on behalf of the user
   // var alias = `On behalf of ${action.channel.id.charAt(0) === 'D' ? action.user.name : "#"+action.channel.name}`
@@ -533,8 +540,13 @@ const reactionButtonPressed = action => new Promise((resolve, reject) => {
   var noBtnMessage = action.original_message
   logger.trace(action.original_message);
   noBtnMessage.attachments.forEach((attachment, i) => {
-    if (attachment.callback_id === 'reaction-buttons')
-      noBtnMessage.attachments[i] = { footer: 'Thanks for your feedback!' }
+    if (attachment.callback_id === 'results-options')
+      noBtnMessage.attachments[i] = {
+        footer: 'Thanks for your feedback! Savvy uses this to learn and get smarter over time 🤖',
+        fallback: 'Thanks for your feedback! Savvy uses this to learn and get smarter over time',
+  			callback_id: 'results-options', // Specify who the bot is going to speak on behalf of, and where.
+        attachment_type: 'default',
+      }
   })
   noBtnMessage.params = {
     attachments: noBtnMessage.attachments
@@ -554,6 +566,18 @@ const reactionButtonPressed = action => new Promise((resolve, reject) => {
     logger.error(e)
   })
 
+  // 2. Send event to mixpanel
+  // track.event('Result Success!', {
+  //   organisationID: user.organisationID,
+  //   messageID: action.message_ts,
+  //   channelID: action.channel.id,
+  //   teamID: action.team.id,
+  //   userID: user.uid,
+  //   searchQuery: params.query,
+  //   results: content.hits,
+  //   noOfResults: content.hits.length,
+  //   searchParams: params
+  // })
 
   // // 2. Post reply to slack on behalf of user
   // const messageData = {
@@ -583,6 +607,9 @@ const reactionButtonPressed = action => new Promise((resolve, reject) => {
 const resultsOptionsPressed = action => {
   logger.trace(resultsOptionsPressed, action)
   switch (action.actions[0].name) {
+    case 'success':
+      return successButtonPressed(action)
+      break
     case 'results':
       if (action.actions[0].value === 'more-results') {
         return packageAndHandleMessage({

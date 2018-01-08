@@ -12,7 +12,7 @@
 
 
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'debug'})
+const logger = tracer.colorConsole({level: 'trace'})
 // tracer.setLevel('warn');
 const sinon = require('sinon')
 const Q = require("q")
