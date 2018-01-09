@@ -486,7 +486,7 @@ const recallMemory = function(requestData) {
 	logger.trace(recallMemory, requestData)
 	const d = Q.defer()
 	var searchTerm = requestData.resolvedQuery.toLowerCase().replace(/[^\w\s]|_/g, "");// memory.context.map(function(e){return e.value}).join(' ');
-  if (typeof requestData.parameters.extraContext !== 'array') requestData.parameters.extraContext = [requestData.parameters.extraContext]
+  if (typeof requestData.parameters.extraContext !== 'object') requestData.parameters.extraContext = [requestData.parameters.extraContext]
   requestData.parameters.extraContext.forEach(phrase => {
     searchTerm = searchTerm.replace(phrase, '')
   })
