@@ -148,9 +148,6 @@ exports.handleMessage = (teamInfo, message) => {
  			if (message.subtype !== 'message_deleted' && (!message.text || message.formsOfAddress.test(message.text)) && !message.bot_id)
 				return messageReceived(message)
       break
-		case 'quick_reply': // ???
-			// ???
-			break
 		case 'reaction_added':
 			if (message.reaction === 'paperclip')
 				return reactionAdded(teamInfo, message, false)
