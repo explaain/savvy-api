@@ -485,16 +485,19 @@ const routeByIntent = function(requestData) {
 const recallMemory = function(requestData) {
 	logger.trace(recallMemory, requestData)
 	const d = Q.defer()
-	const searchTerm = requestData.resolvedQuery;// memory.context.map(function(e){return e.value}).join(' ');
+	var searchTerm = requestData.resolvedQuery.toLowerCase().replace(/[^\w\s]|_/g, "");// memory.context.map(function(e){return e.value}).join(' ');
+  requestData.parameters.extraContext.forEach(phrase => {
+    searchTerm = searchTerm.replace(phrase, '')
+  })
+  searchTerm = searchTerm.substring(0, 500).trim() // Only sends Algolia the first 511 characters as it can't hanlogger.tracee more than that
+  logger.trace(searchTerm)
 	users.fetchUserData(requestData.sender.uid)
 	.then(function(userData) {
 		const readAccessList = userData.readAccess || []
     /* Temporarily allowing everything to search ACME userID */ readAccessList[readAccessList.length] = '101118387301286232222'
 		const userIdFilterString = 'userID: ' + requestData.sender.uid + readAccessList.map(function(id) {return ' OR userID: '+id}).join('');
-    const query = searchTerm.toLowerCase().replace(requestData.parameters.extraContext || '', '').substring(0, 500).trim() // Only sends Algolia the first 511 characters as it can't hanlogger.tracee more than that
-    logger.trace(query)
 		const searchParams = {
-			query: query,
+			query: searchTerm,
 			// filters: userIdFilterString,
       hitsPerPage: 10,
 			// filters: (attachments ? 'hasAttachments: true' : '')
