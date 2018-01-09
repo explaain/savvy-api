@@ -9,9 +9,15 @@ const put = require('101/put')
 const clone = require('101/clone')
 
 const Encrypt = require('../controller/db_encrypt.js');
-const SlackAuthIndex = process.env.ALGOLIA_SLACK_AUTH_INDEX
+const SlackAuthIndex = process.env.ALGOLIA_ORG_INDEX
 
 const slack = require('../platforms/slack')
+
+const verifySlack = token => {
+  const verified = token === process.env.VERIFICATION_TOKEN
+  logger.trace(verified ? '✔️ Slack Verification Token = Verified' : '📛 Slack Verification Token = Failed!!!')
+  return verified
+}
 
 const Orgs = [] // These details are loaded and decrypted from the db, then stored locally here for ease of access
 const getOrg = async teamID => {
@@ -68,6 +74,7 @@ const getRtm = teamID => getTempProp(teamID, 'rtm', token => new RtmClient(token
 const getWeb = teamID => getTempProp(teamID, 'web', token => new WebClient(token))
 
 exports.oauth = function(req, res) {
+  logger.trace('oauth', req)
 	// When a user authorizes an app, a code query parameter is passed on the oAuth endpoint. If that code is not there, we respond with an error message
   if (!req.query.code) {
       res.status(500);
@@ -168,9 +175,11 @@ const initateSlackBot = async (slackTeam, onboarding) => {
 
 
 exports.interactive = function(req, res) {
-	logger.trace(exports.quickreply, req.body)
+	logger.trace('exports.interactive', req.body)
 
 	var action = JSON.parse(req.body.payload)
+  logger.trace('exports.interactive', action)
+  if (!verifySlack(action.token)) return
 
   res.sendStatus(200)
   slack.interactive(action)
@@ -180,7 +189,10 @@ exports.interactive = function(req, res) {
 
 
 exports.events = function(req, res) {
-	logger.trace('exports.events', req.body)
+	// logger.trace('exports.events', req.body)
+	// logger.trace('exports.events', req.body.payload)
+	// logger.trace('exports.events', req.body.payload.token)
+  // if (!verifySlack(req.body.payload.token)) return
 
   res.send({challenge: req.body.challenge})
 }

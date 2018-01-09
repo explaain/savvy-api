@@ -2,6 +2,7 @@ const tracer = require('tracer')
 const logger = tracer.colorConsole({level: 'trace'})
 const sinon = require('sinon')
 const axios = require("axios");
+const track = require('../controller/track')
 const Algolia = require('../controller/db_algolia')
 
 if (process.env.NODE_ENV === "test") {
@@ -29,6 +30,7 @@ if (process.env.NODE_ENV === "test") {
 }
 
 const AlgoliaUsers = new Algolia.Index(process.env.ALGOLIA_APP, process.env.ALGOLIA_ADMIN_API_KEY, process.env.ALGOLIA_USERS_INDEX)
+const AlgoliaOrgs = new Algolia.Index(process.env.ALGOLIA_APP, process.env.ALGOLIA_ADMIN_API_KEY, process.env.ALGOLIA_ORG_INDEX)
 
 /**
  * Takes sender data and returns User object from database
@@ -43,14 +45,19 @@ exports.getUserFromSender = async function(sender, platform) {
     slack: 'user',
     default: 'uid'
   }[platform || 'default']]
-  const user = platform ? await AlgoliaUsers.getFirstFromSearch({
-    filters: platform + ': ' + platformSpecificID
-  }) : await AlgoliaUsers.getObject(platformSpecificID)
-  user.uid = user.objectID
-  user.platformSpecific = sender
-  // delete user.objectID
-  delete user._highlightResult
-  return user
+  try {
+    const user = platform ? await AlgoliaUsers.getFirstFromSearch({
+      filters: platform + ': ' + platformSpecificID
+    }) : await AlgoliaUsers.getObject(platformSpecificID)
+    user.uid = user.objectID
+    user.platformSpecific = sender
+    // delete user.objectID
+    delete user._highlightResult
+    return user
+  } catch (e) {
+    logger.info('Failed to fetch User')
+    return false
+  }
 }
 
 exports.authenticateSender = user => new Promise((resolve, reject) => {
@@ -150,6 +157,28 @@ exports.getUserTeamDetails = function(organisationID, user) {
   })
 }
 
+exports.createUserFromSlack = async slackUser => {
+  logger.trace('createUserFromSlack', slackUser)
+  // Get org data
+  const organisation = await AlgoliaOrgs.getObject(slackUser.team)
+  // Create user object
+  const user = {
+    slack: slackUser.user,
+    slackTeam: slackUser.team,
+    organisationID: organisation.name,
+    algoliaApiKey: organisation.algolia.apiKey,
+    objectID: slackUser.user,
+    uid: slackUser.user
+  }
+  logger.trace(user)
+  // Save user object
+  await AlgoliaUsers.saveObject(user, user)
+
+  logger.info('👤  User Joined and User Data Saved!', user)
+  track.event('User joined', user)
+  return user
+}
+
 exports.addUserToOrganisation = function(organisationID, user, verifiedEmails) {
   return new Promise((resolve, reject) => {
     const data = {
@@ -163,7 +192,7 @@ exports.addUserToOrganisation = function(organisationID, user, verifiedEmails) {
       data: data
     }).then(function(response) {
       logger.info('👤  User Joined and User Data Received!', response.data)
-      track('User joined', {
+      track.event('User joined', {
         organisationID: organisationID,
         userID: user.uid
       })

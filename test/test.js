@@ -1552,7 +1552,7 @@ describe('Bulk', function() {
   })
 
   describe('Database', () => {
-    const index = process.env.ALGOLIA_SLACK_AUTH_INDEX
+    const index = process.env.ALGOLIA_ORG_INDEX
     const data = {
       hello: 'hi',
       __goodbye: 'bye',

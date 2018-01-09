@@ -51,7 +51,9 @@ const Index = class Index {
   async saveObject(user, object) {
     logger.trace('saveObject', user, object)
     const self = this
-    if (!object.objectID) delete object.objectID
+    try {
+      if (!object.objectID) delete object.objectID
+    } catch (e) {}
     const res = await new Promise((resolve, reject) => {
       self.AlgoliaIndex.addObject(object, (err, content) => {
     		if (err) reject(err)

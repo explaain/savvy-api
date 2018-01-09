@@ -375,7 +375,7 @@ function sendResponseAfterDelay(thisResponse, delay) {
         attachment.author_icon = getFileTypeImage(card.fileType)
         if (i === 0) {
           attachment.color = '#645AEF'
-          attachment.title = (card.sentence && card.sentence !== undefined) ? card.sentence : card.title
+          attachment.title = (card.sentence && card.sentence !== undefined && card.sentence !== 'undefined') ? card.sentence : card.title
           const fields = []
           if (card.created) fields.push({
             title: 'Created',
@@ -390,7 +390,7 @@ function sendResponseAfterDelay(thisResponse, delay) {
           params.attachments.push(attachment)
           params.attachments.push({ fields: fields })
         } else if (i < 5 && thisResponse.message.moreResults) {
-          attachment.text = (card.sentence && card.sentence !== undefined) ? card.sentence : card.title
+          attachment.text = (card.sentence && card.sentence !== undefined && card.sentence !== 'undefined') ? card.sentence : card.title
           attachment.color = '#645AEF'
           params.attachments.push(attachment)
         }

@@ -23,8 +23,8 @@ const Sherlock = require('sherlockjs')
 const crypto = require("crypto")
 const axios = require("axios")
 
-const properties = require('../config/properties');
-const track = require('../controller/track');
+const properties = require('../config/properties')
+const track = require('../controller/track')
 const users = require('../controller/users')
 const nlp = require('../controller/nlp')
 const Algolia = require('../controller/db_algolia')
@@ -185,8 +185,13 @@ exports.acceptRequest = async function(req) {
   logger.trace('acceptRequest', req)
   try {
     // req.verified allows platforms/slack.js to verify with a Slack-specific method - if we need to do Firebase-related stuff maybe we should check here too! But for that we'll need some sort of Firebase auth token (normally found only in browser?)...
-    req.sender = await users.getUserFromSender(req.sender, req.platform)
-    if (req.platform !== 'slack' || !req.sender.uid) {
+    var user = await users.getUserFromSender(req.sender, req.platform)
+    logger.trace(user)
+    if (!user && req.platform === 'slack') {
+      user = await users.createUserFromSlack(req.sender)
+    }
+    if (user) req.sender = user
+    if (req.platform !== 'slack') {
       await users.authenticateSender(req.sender)
       await users.checkPermissions(req.organisationID, req.sender)
     }
