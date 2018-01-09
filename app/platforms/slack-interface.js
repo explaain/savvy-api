@@ -166,13 +166,16 @@ const initateSlackBot = async (slackTeam, onboarding) => {
     if (messageTypesToIgnore.indexOf(message.type) === -1 && message.subtype !== 'bot_message') {
       logger.trace('Slack event:', message)
 
-      if (message.text === 'integration' || message.text === 'integrations') {
+      if (message.text.match(/^(<@\w+>)?\s*integration\S?\s*$/)) {
+        logger.trace(slackTeam)
         const org = await getOrg(slackTeam.teamID)
+        logger.trace(org)
         const messageData = {
           teamID: message.team,
           recipient: message.channel,
           text: 'Ready to connect up your Google Drive and become a Savvy power user? 🚀 Just go here: ' + org.name + '.heysavvy.com'
         }
+        logger.trace(messageData)
         sendMessage(messageData)
       } else {
         // Should send data to Chatbot and return messages for emitting
