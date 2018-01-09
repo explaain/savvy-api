@@ -63,15 +63,15 @@ const getTempProp = async (teamID, propKey, newFunc) => {
     return org.temp[propKey]
   }
   else {
-    const propVal = newFunc(org.slack.__botAccessToken)
+    const propVal = newFunc(org.slack)
     setOrgProp(teamID, 'org.temp.' + propKey, propVal)
     logger.trace('Orgs:', Orgs)
     return propVal
   }
 }
-const getBot = teamID => getTempProp(teamID, 'bot', token => new SlackBot({token: token}))
-const getRtm = teamID => getTempProp(teamID, 'rtm', token => new RtmClient(token))
-const getWeb = teamID => getTempProp(teamID, 'web', token => new WebClient(token))
+const getBot = teamID => getTempProp(teamID, 'bot', tokens => new SlackBot({token: tokens.__botAccessToken}))
+const getRtm = teamID => getTempProp(teamID, 'rtm', tokens => new RtmClient(tokens.__botAccessToken))
+const getWeb = teamID => getTempProp(teamID, 'web', tokens => new WebClient(tokens.__accessToken))
 
 exports.oauth = function(req, res) {
   logger.trace('oauth', req)
