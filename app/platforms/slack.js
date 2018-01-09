@@ -476,7 +476,6 @@ function sendResponseAfterDelay(thisResponse, delay) {
 			recipient: thisResponse.recipient.platformSpecific.channel,
 			text: thisResponse.message.text,
       params: params
-			// params: params
 		}
     if (thisResponse.recipient.platformSpecific.ts) messageData.ts = thisResponse.recipient.platformSpecific.ts
     console.log(JSON.stringify(messageData))

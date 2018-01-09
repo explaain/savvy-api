@@ -161,14 +161,25 @@ const initateSlackBot = async (slackTeam, onboarding) => {
     // }
 	})
 
-	bot.on('message', (message) => {
+	bot.on('message', async message => {
     const messageTypesToIgnore = ['hello', 'reconnect_url', 'presence_change', 'desktop_notification', 'user_typing']
     if (messageTypesToIgnore.indexOf(message.type) === -1 && message.subtype !== 'bot_message') {
       logger.trace('Slack event:', message)
 
-      // Should send data to Chatbot and return messages for emitting
-      // TODO: Support postEphemeral(id, user, text, params) for slash commands
-      slack.handleMessage(slackTeam, message)
+      if (message.text === 'integration' || message.text === 'integrations') {
+        const org = await getOrg(slackTeam.teamID)
+        const messageData = {
+          teamID: message.team,
+          recipient: message.channel,
+          text: 'Ready to connect up your Google Drive and become a Savvy power user? 🚀 Just go here: ' + org.name + '.heysavvy.com'
+        }
+        sendMessage(messageData)
+      } else {
+        // Should send data to Chatbot and return messages for emitting
+        // TODO: Support postEphemeral(id, user, text, params) for slash commands
+        slack.handleMessage(slackTeam, message)
+      }
+
     }
 	})
 }
