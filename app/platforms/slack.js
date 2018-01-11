@@ -412,6 +412,14 @@ function sendResponseAfterDelay(thisResponse, delay) {
       delete thisResponse.message.cards
       const actions = []
       if (thisResponse.computed.intent !== 'store') {
+        if (!thisResponse.message.moreResults) {
+          actions.unshift({
+            type: 'button',
+            name: 'results',
+            text: 'Give me more results',
+            value: 'more-results',
+          })
+        }
         const options = [
           {
             "text": "No Filter",
@@ -441,14 +449,6 @@ function sendResponseAfterDelay(thisResponse, delay) {
           selected_options: selectedOptions,
           options: options
         })
-        if (!thisResponse.message.moreResults) {
-          actions.unshift({
-            type: 'button',
-            name: 'results',
-            text: 'Give me more results',
-            value: 'more-results',
-          })
-        }
       }
       actions.unshift({
         type: 'button',
