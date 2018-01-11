@@ -293,7 +293,7 @@ const routeByIntent = function(requestData) {
 	const d = Q.defer()
   var memory = {}
   if (requestData.intent == 'setTask') requestData.intent = 'setTask.dateTime' //temporary
-  if (['setTask', 'setTask.dateTime', 'setTask.URL', 'provideURL', 'provideDateTime'].indexOf(requestData.intent) > -1) requestData.intent = 'storeMemory' // temporary!!
+  if (['setTask', 'setTask.dateTime', 'setTask.URL', 'provideURL', 'provideDateTime'].indexOf(requestData.intent) > -1) requestData.intent = 'store' // temporary!!
   requestData.generalIntent = getGeneralIntent(requestData.intent)
   if (requestData.generalIntent == 'write') {
     memory = getWrittenMemory(requestData)
@@ -315,7 +315,7 @@ const routeByIntent = function(requestData) {
 			tryAnotherMemory(requestData.sender);
 			break;
 
-		case "storeMemory":
+		case "store":
       // logger.info(memory)
 			saveMemory(memory, requestData)
 			.then(function() {
@@ -627,6 +627,8 @@ const saveToDb = function(user, card, requestData) {
   logger.trace(saveToDb, user, card, requestData)
 	const d = Q.defer();
 	card.dateCreated = Date.now()
+  card.description = card.description.replace(/^remember that /i, '').replace(/^remember /i, '')
+  card.description = card.description.charAt(0).toUpperCase() + card.description.slice(1)
 
   const data = {
     objectID: card.objectID || null,
@@ -987,7 +989,7 @@ const combineObjects = function(a, b) {
 const getGeneralIntent = function(intent) {
   // What about no intent?
   // 'provideDateTime', 'provideURL' shouldn't really be automatically 'write'
-  if (['storeMemory', 'setTask', 'setTask.dateTime', 'setTask.URL', 'deleteMemory', 'provideDateTime', 'provideURL'].indexOf(intent) > -1) {
+  if (['store', 'setTask', 'setTask.dateTime', 'setTask.URL', 'deleteMemory', 'provideDateTime', 'provideURL'].indexOf(intent) > -1) {
     return 'write'
   } else if (['query']) {
     return 'read'

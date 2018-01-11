@@ -8,7 +8,7 @@ exports.process = (sender, text, contexts) => new Promise(function(resolve, reje
     const messageToApiai = text.substring(0, 256).replace(/\'/g, '\\\'').replace(/([\uE000-\uF8FF]|\uD83C[\uDF00-\uDFFF]|\uD83D[\uDC00-\uDDFF])/g, '').replace(/\/|\*/gi,''); // Only sends API.AI the first 256 characters as it can't handle more than that
     const headers = {
       'Content-Type': 'application/json; charset=utf-8',
-      'Authorization': 'Bearer bdeba24b4bcf40feb24a1b8c1f86f3f3'
+      'Authorization': 'Bearer ' + process.env.DIALOGFLOW_CLIENT_ACCESS_TOKEN
     };
     const dataString = JSON.stringify({
       query: messageToApiai,

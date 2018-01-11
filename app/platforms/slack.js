@@ -189,7 +189,7 @@ const reactionAdded = async (teamInfo, message, includeTitle) => {
 	const newMessage = transformMessage(teamInfo, messageData[0])
 	logger.trace('newMessage', newMessage)
 	// Save message to database
-	const context = { intent: 'storeMemory' }
+	const context = { intent: 'store' }
 	if (includeTitle) context.title = messageData[1].text
 	return await packageAndHandleMessage(newMessage, context)
 }
@@ -263,7 +263,10 @@ const packageAndHandleMessage = (message, context) => new Promise((resolve, reje
     apiResult.messageData.map(data => {
       data.data.request = {
         query: apiResult.requestData.resolvedQuery,
-        filters: apiResult.requestData.filters
+        filters: apiResult.requestData.filters,
+      }
+      data.data.computed = {
+        intent: apiResult.requestData.intent
       }
       return data
     })
@@ -407,39 +410,45 @@ function sendResponseAfterDelay(thisResponse, delay) {
         }
       })
       delete thisResponse.message.cards
-      const actions = [
-        {
+      const actions = []
+      if (thisResponse.computed.intent !== 'store') {
+        const options = [
+          {
+            "text": "No Filter",
+            "value": "all"
+          },
+          {
+            "text": "Filter by: Files",
+            "value": "file"
+          },
+          {
+            "text": "Filter by: Content from Files",
+            "value": "p"
+          },
+          {
+            "text": "Filter by: Content Created Manually",
+            "value": "manual"
+          },
+        ]
+        var selectedOptions = options.filter(option => thisResponse.filters && thisResponse.filters.type && option.value === thisResponse.filters.type)
+        if (!selectedOptions.length) selectedOptions = [options[0]]
+        logger.trace(selectedOptions)
+        actions.unshift({
           type: 'select',
           name: 'filter-type',
           style: 'primary',
-          text: thisResponse.filters && thisResponse.filters.type && thisResponse.filters.type !== 'all' ? 'Returning only: ' + ({ file: 'Files', p: 'Content from Files', manual: 'Manually Created Content' }[thisResponse.filters.type]) : 'All types of content',
-          options: [
-            {
-              "text": "All types of content",
-              "value": "all"
-            },
-            {
-              "text": "Only return Files",
-              "value": "file"
-            },
-            {
-              "text": "Only return Content from Files",
-              "value": "p"
-            },
-            {
-              "text": "Only return Content Created Manually",
-              "value": "manual"
-            },
-          ]
-        },
-      ]
-      if (!thisResponse.message.moreResults) {
-        actions.unshift({
-          type: 'button',
-          name: 'results',
-          text: 'Give me more results',
-          value: 'more-results',
+          // text: thisResponse.filters && thisResponse.filters.type && thisResponse.filters.type !== 'all' ? 'Returning only: ' + ({ file: 'Files', p: 'Content from Files', manual: 'Manually Created Content' }[thisResponse.filters.type]) : 'All types of content',
+          selected_options: selectedOptions,
+          options: options
         })
+        if (!thisResponse.message.moreResults) {
+          actions.unshift({
+            type: 'button',
+            name: 'results',
+            text: 'Give me more results',
+            value: 'more-results',
+          })
+        }
       }
       actions.unshift({
         type: 'button',
@@ -452,7 +461,7 @@ function sendResponseAfterDelay(thisResponse, delay) {
       logger.trace(thisResponse.request)
       logger.trace(thisResponse.request.query)
       params.attachments.push({
-        title: thisResponse.filters && thisResponse.filters.type && thisResponse.filters.type !== 'all' ? 'Returning only: ' + ({ file: 'Files', p: 'Content from Files', manual: 'Manually Created Content' }[thisResponse.filters.type]) : 'Returning all types of content',
+        // title: thisResponse.filters && thisResponse.filters.type && thisResponse.filters.type !== 'all' ? 'Returning only: ' + ({ file: 'Files', p: 'Content from Files', manual: 'Manually Created Content' }[thisResponse.filters.type]) : 'Returning all types of content',
         fallback: "Oops, you can't ask for more",
         callback_id: 'results-options__' + encodeURIComponent(thisResponse.request.query), // Specify who the bot is going to speak on behalf of, and where.
         // color: "#645AEF",
@@ -556,7 +565,7 @@ const successButtonPressed = action => new Promise((resolve, reject) => {
   var noBtnMessage = action.original_message
   logger.trace(action.original_message);
   noBtnMessage.attachments.forEach((attachment, i) => {
-    if (attachment.callback_id.split('__')[0] === 'results-options')
+    if (attachment.callback_id && attachment.callback_id.split('__')[0] === 'results-options')
       noBtnMessage.attachments[i] = {
         footer: 'Thanks for your feedback! Savvy uses this to learn and get smarter over time 🤖',
         fallback: 'Thanks for your feedback! Savvy uses this to learn and get smarter over time',

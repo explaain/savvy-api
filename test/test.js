@@ -41,7 +41,7 @@ sandbox.stub(nlp, 'process').callsFake((sender, query, contexts) => new Promise(
     resolvedQuery: query,
     contexts: [],
     score: 0.8600000143051147,
-    intent: query == 'hi' ? 'greeting' : (query.indexOf('The ') === 0 ? 'storeMemory' : 'query')
+    intent: query == 'hi' ? 'greeting' : (query.indexOf('The ') === 0 ? 'store' : 'query')
   })
 }))
 sandbox.stub(uploader, 'upload').resolves('url_123')
@@ -340,8 +340,8 @@ describe('Bulk', function() {
         sendApiRequest(sender, message, results, done)
       });
 
-      it('should be interpreted as a "storeMemory"', function(done) {
-        assert.equal(results.body.requestData.intent, 'storeMemory')
+      it('should be interpreted as a "store"', function(done) {
+        assert.equal(results.body.requestData.intent, 'store')
         done()
       })
       it('should bring back a result with the "sentence" parameter "' + expectedReturn + '"', function(done) {
@@ -850,7 +850,7 @@ describe('Bulk', function() {
     describe('0001 Message sequences', function() {
       const message1 = "What is my name?"
       const code1 = "USER_FEEDBACK_MIDDLE"
-      describe('Recall different memories, change to storeMemory, add attachment, change back and then request Carousel', function() {
+      describe('Recall different memories, change to store, add attachment, change back and then request Carousel', function() {
         var resultList = []
         describe('!...Sending the message "' + message1 + '", followed by the quick reply "' + code1 + '"', function() {
 

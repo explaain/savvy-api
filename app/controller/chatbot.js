@@ -1,6 +1,6 @@
 //TODO: ask about reminders at unsociable hours
 //@TODO: general error handling!
-//@TODO: always accept storeMemory after attachment (?)
+//@TODO: always accept store after attachment (?)
 //@TODO: Stop interpreting thumbs up as attachment - interpret it as 'affirmation' instead
 //@TODO: Don't do default quick replies when bot asks for info
 //@TODO: Have timeout on unresolved webhooks
@@ -183,7 +183,7 @@ exports.handleMessage = body => new Promise((resolve, reject) => {
 const onboardingCheck = function(sender, intent) {
 	if (getContext(sender, 'onboarding')) {
 		switch (intent) {
-			case 'storeMemory':
+			case 'store':
 				const textMessage = createTextMessage(sender, "Now try typing: \n\nWhat\'s my secret superpower?")
 				return [{data: textMessage, delay: 2000}]
 				break;
@@ -287,7 +287,7 @@ const handleQuickReplies = function(requestData, quickReply, extraData) {
 			break;
 
 		case "CORRECTION_QUERY_TO_STORE":
-			intentConfidence(sender, getContext(sender, 'lastAction').requestData.resolvedQuery, {intent: 'storeMemory'})
+			intentConfidence(sender, getContext(sender, 'lastAction').requestData.resolvedQuery, {intent: 'store'})
 			.then(function(res) {
 				d.resolve(res)
 			}).catch(function(e) {
@@ -584,7 +584,7 @@ function sendCorrectionMessage(recipient) {
 	switch (getContext(recipient, 'lastAction').requestData.intent) {
 		case 'setTask.dateTime':
 		case 'setTask.URL':
-		case 'storeMemory':
+		case 'store':
 			var quickReplies = [
 				["💭 Recall a memory", "CORRECTION_STORE_TO_QUERY"]
 			]
@@ -735,7 +735,7 @@ const getResponseMessage = function(data) {
 					}
 					break;
 
-				case 'storeMemory':
+				case 'store':
 					m.resultSentence = "I've now remembered that for you!" // + (m.title ? m.title + '\n\n' : '') + m.sentence;
 					break;
 
