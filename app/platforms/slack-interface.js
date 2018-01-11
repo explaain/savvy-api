@@ -156,9 +156,9 @@ const initateSlackBot = async (slackTeam, onboarding) => {
 	bot.on('start', () => {
 		logger.info('Slackbot has 🙏 connected to team ' + slackTeam.name)
 
-    // if (onboarding) {
-    //   bot.postMessage(onboarding.userID, `Hello! Welcome to Savvy :)`)
-    // }
+    if (onboarding) {
+      bot.postMessage(onboarding.userID, `Hello! Welcome to Savvy :)`)
+    }
 	})
 
 	bot.on('message', async message => {
