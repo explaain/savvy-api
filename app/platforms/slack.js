@@ -259,7 +259,14 @@ const packageAndHandleMessage = (message, context) => new Promise((resolve, reje
 
   chatbotController.handleMessage(messagePackage)
   .then(function(apiResult) {
-    logger.trace("FROM API==>", apiResult && apiResult.messageData ? JSON.stringify(apiResult.messageData, null, 2) : "No response text.")
+    logger.trace("FROM API==>", apiResult && apiResult.messageData ? apiResult /*JSON.stringify(apiResult.messageData, null, 2)*/ : "No response text.")
+    apiResult.messageData.map(data => {
+      data.data.request = {
+        query: apiResult.requestData.resolvedQuery,
+        filters: apiResult.requestData.filters
+      }
+      return data
+    })
     return handleResponseGroup(apiResult)
   }).then(res => {
 		resolve(res)
@@ -370,6 +377,11 @@ function sendResponseAfterDelay(thisResponse, delay) {
         if (card.fileTitle) {attachment.author_name = (card.type === 'file' ? '' : 'From: ') + card.fileTitle}
         if (card.fileUrl) attachment.author_link = card.fileUrl
         attachment.author_icon = getFileTypeImage(card.fileType)
+        if (card.type === 'file') {
+          attachment.title = card.fileTitle
+          attachment.title_link = card.fileUrl
+          attachment.thumb_url = getFileTypeImage(card.fileType)
+        }
         if (i === 0) {
           attachment.color = '#645AEF'
           attachment.title = (card.sentence && card.sentence !== undefined && card.sentence !== 'undefined') ? card.sentence : card.title
@@ -387,8 +399,10 @@ function sendResponseAfterDelay(thisResponse, delay) {
           params.attachments.push(attachment)
           params.attachments.push({ fields: fields })
         } else if (i < 5 && thisResponse.message.moreResults) {
-          attachment.text = (card.sentence && card.sentence !== undefined && card.sentence !== 'undefined') ? card.sentence : card.title
+          if (card.type !== 'file')
+            attachment.text = (card.sentence && card.sentence !== undefined && card.sentence !== 'undefined') ? card.sentence : card.title
           attachment.color = '#645AEF'
+          attachment.footer = 'Last Modified: ' + new Date(card.modified * 1000).toDateString()
           params.attachments.push(attachment)
         }
       })
@@ -434,10 +448,13 @@ function sendResponseAfterDelay(thisResponse, delay) {
         text: '😍 That\'s what I needed',
         value: 'success'
       })
+      logger.trace(thisResponse)
+      logger.trace(thisResponse.request)
+      logger.trace(thisResponse.request.query)
       params.attachments.push({
         title: thisResponse.filters && thisResponse.filters.type && thisResponse.filters.type !== 'all' ? 'Returning only: ' + ({ file: 'Files', p: 'Content from Files', manual: 'Manually Created Content' }[thisResponse.filters.type]) : 'Returning all types of content',
         fallback: "Oops, you can't ask for more",
-        callback_id: 'results-options', // Specify who the bot is going to speak on behalf of, and where.
+        callback_id: 'results-options__' + encodeURIComponent(thisResponse.request.query), // Specify who the bot is going to speak on behalf of, and where.
         // color: "#645AEF",
         attachment_type: "default",
         actions: actions
@@ -513,7 +530,7 @@ exports.interactive = function(action) {
 
 	logger.trace("User interacted with something interactive!", action)
 
-  switch (action.callback_id) {
+  switch (action.callback_id.split('__')[0]) {
     case 'reaction-buttons':
       return reactionButtonPressed(action)
     case 'results-options':
@@ -539,11 +556,11 @@ const successButtonPressed = action => new Promise((resolve, reject) => {
   var noBtnMessage = action.original_message
   logger.trace(action.original_message);
   noBtnMessage.attachments.forEach((attachment, i) => {
-    if (attachment.callback_id === 'results-options')
+    if (attachment.callback_id.split('__')[0] === 'results-options')
       noBtnMessage.attachments[i] = {
         footer: 'Thanks for your feedback! Savvy uses this to learn and get smarter over time 🤖',
         fallback: 'Thanks for your feedback! Savvy uses this to learn and get smarter over time',
-  			callback_id: 'results-options', // Specify who the bot is going to speak on behalf of, and where.
+  			callback_id: attachment.callback_id, // Specify who the bot is going to speak on behalf of, and where.
         attachment_type: 'default',
       }
   })

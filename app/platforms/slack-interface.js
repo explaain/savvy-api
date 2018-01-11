@@ -162,7 +162,7 @@ const initateSlackBot = async (slackTeam, onboarding) => {
 	})
 
 	bot.on('message', async message => {
-    const messageTypesToIgnore = ['hello', 'reconnect_url', 'presence_change', 'desktop_notification', 'user_typing']
+    const messageTypesToIgnore = ['hello', 'reconnect_url', 'presence_change', 'desktop_notification', 'user_typing', 'channel_joined']
     if (messageTypesToIgnore.indexOf(message.type) === -1 && message.subtype !== 'bot_message') {
       logger.trace('Slack event:', message)
 

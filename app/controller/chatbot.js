@@ -164,12 +164,14 @@ exports.handleMessage = body => new Promise((resolve, reject) => {
 		}
 		firstPromise
 		.then(function(res) {
+			logger.trace(res)
 			const responseMessage = res ? getResponseMessage(res) : null
 			if (res && res.memories) { // Not sure if this is the right condition?
 				logger.trace('Setting lastAction context')
 				setContext(sender, 'lastAction', res)
 			}
 			if (responseMessage) responseMessage.messageData.push.apply(responseMessage.messageData, onboardingCheck(sender, res.requestData.intent))
+			logger.trace(responseMessage)
 			resolve(responseMessage)
 		}).catch(function(e) {
 			logger.error(e)
