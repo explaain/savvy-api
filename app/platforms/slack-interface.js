@@ -110,6 +110,7 @@ exports.oauth = function(req, res) {
         .then(teamInfo => {
           org.slack.name = teamInfo.name
           org.slack.domain = teamInfo.domain
+          org.name = teamInfo.domain
           setOrg(teamID, org)
         }).then(result => {
           initateSlackBot(org.slack, { userID: slackKeychain.user_id })
