@@ -1,6 +1,7 @@
 const tracer = require('tracer')
 const logger = tracer.colorConsole({level: 'trace'})
 const request = require('request')
+const axios = require('axios')
 const SlackBot = require('slackbots')
 const RtmClient = require('@slack/client').RtmClient
 const { WebClient } = require('@slack/client');
@@ -87,7 +88,7 @@ exports.oauth = function(req, res) {
     request({
       url: 'https://slack.com/api/oauth.access', //URL to hit
       qs: {code: req.query.code, client_id: process.env.SLACK_CLIENT_ID, client_secret: process.env.SLACK_CLIENT_SECRET}, //Query string data
-      method: 'GET', //Specify the method
+      method: 'GET'
     }, function (error, response, body) {
       const slackKeychain = JSON.parse(body)
       if (!slackKeychain.ok) {
@@ -112,7 +113,8 @@ exports.oauth = function(req, res) {
           org.slack.domain = teamInfo.domain
           org.name = teamInfo.domain
           setOrg(teamID, org)
-        }).then(result => {
+        }).then(result => axios.post('https://savvy-nlp--staging.herokuapp.com/set-up-org', { organisationID: org.name }))
+        .then(res => {
           initateSlackBot(org.slack, { userID: slackKeychain.user_id })
           res.redirect(`https://${org.slack.domain}.slack.com/`)
         }).catch(e => {
