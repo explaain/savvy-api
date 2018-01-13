@@ -113,8 +113,8 @@ exports.oauth = function(req, res) {
           org.slack.domain = teamInfo.domain
           org.name = teamInfo.domain
           setOrg(teamID, org)
-        }).then(result => axios.post('https://savvy-nlp--staging.herokuapp.com/set-up-org', { organisationID: org.name }))
-        .then(res => {
+        }).then(result => {
+          axios.post('https://savvy-nlp--staging.herokuapp.com/set-up-org', { organisationID: org.name })
           initateSlackBot(org.slack, { userID: slackKeychain.user_id })
           res.redirect(`https://${org.slack.domain}.slack.com/`)
         }).catch(e => {
