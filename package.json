@@ -9,7 +9,7 @@
     "test-chatbot": "ALGOLIA_INDEX=ForgetMeNot_Context_Test mocha --grep '^((?!Task).)*Chatbot((?!Task).)*$'",
     "test-slack": "ALGOLIA_INDEX=ForgetMeNot_Context_Test mocha --grep 'Slack'",
     "test-db": "ALGOLIA_INDEX=ForgetMeNot_Context_Test mocha --grep 'Database'",
-    "test-custom": "ALGOLIA_INDEX=ForgetMeNot_Context_Test mocha --grep 'Manually filter to just files'"
+    "test-custom": "ALGOLIA_INDEX=ForgetMeNot_Context_Test mocha --grep 'Ask a question, then ask for more results'"
   },
   "dependencies": {
     "101": "^1.6.2",

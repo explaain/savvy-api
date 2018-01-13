@@ -262,7 +262,7 @@ const packageAndHandleMessage = (message, context) => new Promise((resolve, reje
     logger.trace("FROM API==>", apiResult && apiResult.messageData ? apiResult /*JSON.stringify(apiResult.messageData, null, 2)*/ : "No response text.")
     apiResult.messageData.map(data => {
       data.data.request = {
-        query: apiResult.requestData.resolvedQuery,
+        query: apiResult.requestData.query,
         filters: apiResult.requestData.filters,
       }
       data.data.computed = {
@@ -650,6 +650,9 @@ const resultsOptionsPressed = action => {
       if (action.actions[0].value === 'more-results') {
         return packageAndHandleMessage({
           quick_reply: 'REQUEST_MORE_RESULTS',
+          data: {
+            query: decodeURIComponent(action.callback_id.split('__')[1]),
+          },
           sender: {
             team: action.team.id,
             channel: action.channel.id,
@@ -663,9 +666,11 @@ const resultsOptionsPressed = action => {
       return packageAndHandleMessage({
         quick_reply: 'FILTER_RESULTS',
         data: {
+          query: decodeURIComponent(action.callback_id.split('__')[1]),
           filters: {
             type: action.actions[0].selected_options[0].value
           },
+          whatsNew: 'filters'
         },
         sender: {
           team: action.team.id,

@@ -38,7 +38,7 @@ sandbox.stub(track, 'event').returns()
 sandbox.stub(nlp, 'process').callsFake((sender, query, contexts) => new Promise((resolve, reject) => {
   resolve({
     source: 'agent',
-    resolvedQuery: query,
+    query: query,
     contexts: [],
     score: 0.8600000143051147,
     intent: query == 'hi' ? 'greeting' : (query.indexOf('The ') === 0 ? 'store' : 'query')
@@ -1459,7 +1459,7 @@ describe('Bulk', function() {
       var result
       before(async () => {
         await sendSlackMessage('What\'s the Savvy colour?')
-        result = await slack.interactive(JSON.parse( '{"type":"interactive_message","actions":[{"name":"filter-type","type":"button","selected_options":[{"value":"file", "text":"Give me just file results"}]}],"callback_id":"results-options","team":{"id":"T04NVHJBK","domain":"explaain"},"channel":{"id":"C7BQBL138","name":"bot-testing"},"user":{"id":"U04NVHJFD","name":"jeremy"},"action_ts":"1515101782.306526","message_ts":"1514506085.000191","attachment_id":"1","token":"Yrn00Mm2UXAMpEGrSc5GYTpF","is_app_unfurl":false,"original_message":{"text":"Here\'s what I '
+        result = await slack.interactive(JSON.parse( '{"type":"interactive_message","actions":[{"name":"filter-type","type":"button","selected_options":[{"value":"file", "text":"Give me just file results"}]}],"callback_id":"results-options__What\'s%20the%20Savvy%20colour%3F","team":{"id":"T04NVHJBK","domain":"explaain"},"channel":{"id":"C7BQBL138","name":"bot-testing"},"user":{"id":"U04NVHJFD","name":"jeremy"},"action_ts":"1515101782.306526","message_ts":"1514506085.000191","attachment_id":"1","token":"Yrn00Mm2UXAMpEGrSc5GYTpF","is_app_unfurl":false,"original_message":{"text":"Here\'s what I '
           + 'found:","username":"ForgetMeNot_local","bot_id":"B7DRNAZ0Q","attachments":[{"callback_id":"vZweCaZEWlZPx0gpQn2b1B7DFAZ2","fallback":"Oops, you can\'t quick-reply","footer":"Quick'
           + 'actions","id":1,"color":"FED33C","actions":[{"id":"1","name":"USER_FEEDBACK_TOP","text":"\\ud83d\\ude0d","type":"button","value":"\\ud83d\\ude0d","style":""},{"id":"2","name":"USER_FEEDBACK_MIDDLE","text":"\\u270f\\ufe0f","type":"button","value":"\\u270f\\ufe0f","style":""},{"id":"3","name":"USER_FEEDBACK_BOTTOM","text":"\\ud83d\\ude14","type":"button","value":"\\ud83d\\ude14","style":""}]},{"author_name":"From: Savvy 1 pager - Generic","title":"What is Savvy?\\n\\n- Savvy is an app'
           + 'that lives where you work. It works on its own website, via a browser extension and Slack. It connects to the tools you use at work, like Google Drive, Dropbox, Trello and more, and allows you to find the answers to the questions you have wherever you are.\\n- You interact with it in natural language. You can ask it questions like, \\u201cwhere are the latest financial projections\\u201d or \\u201cwhat\\u2019s our holiday policy?\\u201d It\\u2019ll return links to the best files and'
@@ -1529,8 +1529,8 @@ describe('Bulk', function() {
     describe('Ask a question, then ask for more results', function() {
       var result
       before(async () => {
-        await sendSlackMessage('What\'s the Savvy colour?')
-        result = await slack.interactive(JSON.parse( '{"type":"interactive_message","actions":[{"name":"results","type":"button","value":"more-results","text":"Give me more results"}],"callback_id":"results-options","team":{"id":"T04NVHJBK","domain":"explaain"},"channel":{"id":"C7BQBL138","name":"bot-testing"},"user":{"id":"U04NVHJFD","name":"jeremy"},"action_ts":"1515101782.306526","message_ts":"1515101537.000341","attachment_id":"1","token":"Yrn00Mm2UXAMpEGrSc5GYTpF","is_app_unfurl":false,"original_message":{"text":"Here\'s what I '
+        await sendSlackMessage('What\'s the Savvy purple colour?')
+        result = await slack.interactive(JSON.parse( '{"type":"interactive_message","actions":[{"name":"results","type":"button","value":"more-results","text":"Give me more results"}],"callback_id":"results-options__What\'s%20the%20Savvy%20purple%20colour%3F","team":{"id":"T04NVHJBK","domain":"explaain"},"channel":{"id":"C7BQBL138","name":"bot-testing"},"user":{"id":"U04NVHJFD","name":"jeremy"},"action_ts":"1515101782.306526","message_ts":"1515101537.000341","attachment_id":"1","token":"Yrn00Mm2UXAMpEGrSc5GYTpF","is_app_unfurl":false,"original_message":{"text":"Here\'s what I '
           + 'found:","username":"ForgetMeNot_local","bot_id":"B7DRNAZ0Q","attachments":[{"callback_id":"vZweCaZEWlZPx0gpQn2b1B7DFAZ2","fallback":"Oops, you can\'t quick-reply","footer":"Quick'
           + 'actions","id":1,"color":"FED33C","actions":[{"id":"1","name":"USER_FEEDBACK_TOP","text":"\\ud83d\\ude0d","type":"button","value":"\\ud83d\\ude0d","style":""},{"id":"2","name":"USER_FEEDBACK_MIDDLE","text":"\\u270f\\ufe0f","type":"button","value":"\\u270f\\ufe0f","style":""},{"id":"3","name":"USER_FEEDBACK_BOTTOM","text":"\\ud83d\\ude14","type":"button","value":"\\ud83d\\ude14","style":""}]},{"author_name":"From: Savvy 1 pager - Generic","title":"What is Savvy?\\n\\n- Savvy is an app'
           + 'that lives where you work. It works on its own website, via a browser extension and Slack. It connects to the tools you use at work, like Google Drive, Dropbox, Trello and more, and allows you to find the answers to the questions you have wherever you are.\\n- You interact with it in natural language. You can ask it questions like, \\u201cwhere are the latest financial projections\\u201d or \\u201cwhat\\u2019s our holiday policy?\\u201d It\\u2019ll return links to the best files and'
@@ -1545,8 +1545,12 @@ describe('Bulk', function() {
         logger.debug(result[0])
         assert(result[0].text)
       })
-      it('should return confirmation', () => {
-        assert.equal(result[0].text, 'I\'ve now remembered that for you! My very important Question\n\nYour very important Answer')
+      it('should return results', () => {
+        assert.equal(result[0].text, 'Here\'s what I found:')
+      })
+      it('should return the correct result', () => {
+        logger.debug(result[0].params.attachments)
+        assert.equal(result[0].params.attachments[0].title, 'Brand colours:\n\n- Orange: #EF9A3B\n- Pink: #D62459\n- Blue: #409AD5\n- Green: #34BA9C\n- Orange/Red Blend: #EA6466\n- Purple: #645AEF')
       })
     })
   })

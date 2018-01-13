@@ -29,7 +29,7 @@ exports.process = (sender, text, contexts) => new Promise(function(resolve, reje
       if (!error && response.statusCode == 200) {
         const result = JSON.parse(body).result
         result.intent = result.metadata.intentName
-        result.resolvedQuery = text //Should actually just not rely on resolvedQuery later on
+        result.query = text //Should actually just not rely on query later on
         logger.trace('DialogFlow Result:', result)
         resolve(result)
       } else {
@@ -39,7 +39,7 @@ exports.process = (sender, text, contexts) => new Promise(function(resolve, reje
         // Need to handle this properly
         result = {
           intent: 'query',
-          resolvedQuery: text,
+          query: text,
         }
         resolve(result)
       }

@@ -277,7 +277,7 @@ const handleQuickReplies = function(requestData, quickReply, extraData) {
 		case "CORRECTION_STORE_TO_QUERY":
 			api.deleteMemories(sender, getContext(sender, 'lastAction').memories[0].objectID)
 			.then(function() {
-				return intentConfidence(sender, getContext(sender, 'lastAction').requestData.resolvedQuery, {intent: 'query'})
+				return intentConfidence(sender, getContext(sender, 'lastAction').requestData.query, {intent: 'query'})
 			}).then(function(res) {
 				d.resolve(res)
 			}).catch(function(e) {
@@ -287,7 +287,7 @@ const handleQuickReplies = function(requestData, quickReply, extraData) {
 			break;
 
 		case "CORRECTION_QUERY_TO_STORE":
-			intentConfidence(sender, getContext(sender, 'lastAction').requestData.resolvedQuery, {intent: 'store'})
+			intentConfidence(sender, getContext(sender, 'lastAction').requestData.query, {intent: 'store'})
 			.then(function(res) {
 				d.resolve(res)
 			}).catch(function(e) {
@@ -304,29 +304,34 @@ const handleQuickReplies = function(requestData, quickReply, extraData) {
 			break;
 
 		case "REQUEST_MORE_RESULTS":
-			var data = getContext(sender, 'lastAction')
-			data.requestData.moreResults = true // This should be generalised
-			data.requestData.sender.platformSpecific = sender
-			logger.trace(data.requestData)
-			delete data.messageData
-			setContext(sender, 'lastAction', data)
-			d.resolve(data)
+			logger.trace(extraData)
+			const lastAction = getContext(sender, 'lastAction')
+			logger.trace(lastAction)
+			matchesLastAction = Object.keys(extraData).filter(key => { console.log(extraData[key]); console.log(lastAction.requestData[key]); return key !== extraData.whatsNew && extraData[key] !== lastAction.requestData[key]}).length === 0
+			logger.trace(matchesLastAction)
+			if (matchesLastAction) {
+				lastAction.requestData.moreResults = true // This should be generalised
+				lastAction.requestData.sender.platformSpecific = sender
+				logger.trace(lastAction.requestData)
+				delete lastAction.messageData
+				setContext(sender, 'lastAction', lastAction)
+				d.resolve(lastAction)
+			} else {
+				extraData.moreResults = true // This should be generalised
+				intentConfidence(sender, extraData.query, extraData)
+				.then(function(res) {
+					d.resolve(res)
+				}).catch(function(e) {
+					logger.error(e)
+					d.reject(e)
+				})
+			}
 			break;
 
 		case "FILTER_RESULTS":
-			// var data = getContext(sender, 'lastAction')
-			// logger.trace(data)
-			// data.requestData.filters[quickReplyData.filter] = quickReplyData.value
-			// delete data.memories
-			// delete data.messageData
-			// logger.trace(data)
 			logger.trace(extraData)
 			logger.trace(quickReplyData)
-			// const extraData = {
-			// 	filters: {}
-			// }
-			// extraData.filters[quickReplyData.filter] = quickReplyData.value
-			intentConfidence(sender, getContext(sender, 'lastAction').requestData.resolvedQuery, extraData)
+			intentConfidence(sender, extraData.query, extraData)
 			.then(function(res) {
 				d.resolve(res)
 			}).catch(function(e) {

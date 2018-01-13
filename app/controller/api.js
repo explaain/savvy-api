@@ -485,7 +485,7 @@ const routeByIntent = function(requestData) {
 const recallMemory = function(requestData) {
 	logger.trace(recallMemory, requestData)
 	const d = Q.defer()
-	var searchTerm = requestData.resolvedQuery.toLowerCase().replace(/[^\w\s]|_/g, "");// memory.context.map(function(e){return e.value}).join(' ');
+	var searchTerm = requestData.query.toLowerCase().replace(/[^\w\s]|_/g, "");// memory.context.map(function(e){return e.value}).join(' ');
   logger.trace(requestData.parameters.extraContext)
   if (typeof requestData.parameters.extraContext !== 'object' && typeof requestData.parameters.extraContext !== 'array') requestData.parameters.extraContext = [requestData.parameters.extraContext]
   logger.trace(requestData.parameters.extraContext)
@@ -953,10 +953,10 @@ const getWrittenMemory = function(requestData) {
   memory.intent = requestData.intent;
   memory.author = requestData.sender.uid;
   // memory.content = requestData.content || {
-  //   description: rewriteSentence(requestData.resolvedQuery),
+  //   description: rewriteSentence(requestData.query),
   //   listItems: requestData.listItems,
   // }
-  memory.description = rewriteSentence(requestData.resolvedQuery)
+  memory.description = rewriteSentence(requestData.query)
   if (requestData.title) memory.title = requestData.title
   if (requestData.listItems) memory.listItems = requestData.listItems
   memory.extractedFrom = requestData.extractedFrom
