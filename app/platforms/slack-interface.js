@@ -160,7 +160,7 @@ const initateSlackBot = async (slackTeam, onboarding) => {
 		logger.info('Slackbot has 🙏 connected to team ' + slackTeam.name)
 
     if (onboarding) {
-      bot.postMessage(onboarding.userID, `Hello! Welcome to Savvy 🙂 Head over to ${slackTeam.domain}.heysavvy.com to connect up to Google Drive! 🚀`)
+      bot.postMessage(onboarding.userID, `Hello! Welcome to Savvy 🙂 Head over to connect.heysavvy.com/?org=${slackTeam.domain} to connect up to Google Drive! 🚀`)
     }
 	})
 
