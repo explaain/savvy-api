@@ -175,6 +175,8 @@ exports.createUserFromSlack = async slackUser => {
   await AlgoliaUsers.saveObject(user, user)
 
   logger.info('👤  User Joined and User Data Saved!', user)
+  const allUsers = await AlgoliaOrgs.searchObjects({ query: '' })
+  user.totalUsers = allUsers.length
   track.event('User joined', user)
   return user
 }

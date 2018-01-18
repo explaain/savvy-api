@@ -607,12 +607,23 @@ const searchForCards = async function(user, params) {
     // const itemCards = await fetchListItemCards(apiKey, index, content.hits) // What do we do with itemCards here?!
     logger.trace('Search Results:', content)
     track.event('Searched', {
+      distinct_id: user.uid,
       organisationID: user.organisationID,
       userID: user.uid,
       searchQuery: params.query,
       results: content.hits,
       noOfResults: content.hits.length,
-      searchParams: params
+      searchParams: params,
+      cardID: content.hits.length === 1 ? content.hits[0].objectID : null,
+      cardContent: content.hits.length === 1 ? content.hits[0].description || content.hits[0].content || content.hits[0].title : null,
+      cardTitle: content.hits.length === 1 ? content.hits[0].title || content.hits[0].fileTitle : null,
+      fileTitle: content.hits.length === 1 ? content.hits[0].fileTitle : null,
+      fileUrl: content.hits.length === 1 ? content.hits[0].fileUrl : null,
+      fileID: content.hits.length === 1 ? content.hits[0].fileID : null,
+      fileType: content.hits.length === 1 ? content.hits[0].fileType : null,
+      cardType: content.hits.length === 1 ? content.hits[0].type : null,
+      cardModified: content.hits.length === 1 ? content.hits[0].modified : null,
+      cardCreated: content.hits.length === 1 ? content.hits[0].created : null,
     })
     return content
   } catch (e) {
@@ -632,6 +643,7 @@ const saveToDb = function(user, card, requestData) {
 
   const data = {
     objectID: card.objectID || null,
+    title: card.title,
     description: card.description,
     authorID: user.uid,
     created: parseInt(new Date().getTime()/1000),
@@ -644,9 +656,16 @@ const saveToDb = function(user, card, requestData) {
     logger.trace('📪  The response!', response)
     if (!data.objectID) data.objectID = response.objectID
     track.event('Card Saved', {
+      distinct_id: data.authorID,
       organisationID: data.organisationID,
-      userID: data.userID,
-      card: data
+      userID: data.authorID,
+      card: data,
+      cardID: data.objectID,
+      cardContent: card.description,
+      cardTitle: card.title,
+      cardType: 'manual',
+      cardModified: data.modified,
+      cardCreated: data.created,
     })
 		logger.trace('User card updated successfully!')
     d.resolve()

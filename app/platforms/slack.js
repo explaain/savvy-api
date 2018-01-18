@@ -7,6 +7,7 @@ const sinon = require('sinon')
 const track = require('../controller/track')
 const chatbotController = require('../controller/chatbot')
 const properties = require('../config/properties.js')
+const users = require('../controller/users')
 
 const tracer = require('tracer')
 const logger = tracer.colorConsole({level: 'trace'})
@@ -592,27 +593,38 @@ const successButtonPressed = action => new Promise((resolve, reject) => {
   })
 
   // 2. Send event to mixpanel
-  track.event('Result Success!', {
-    // organisationID: user.organisationID,
-    messageID: action.message_ts,
-    userID: action.user.id,
-    userName: action.user.name,
-    channelID: action.channel.id,
-    channelName: action.channel.name,
-    teamID: action.team.id,
-    teamName: action.team.domain,
-    // userID: user.uid,
-    // searchQuery: params.query,
-    results: action.original_message.attachments.filter(attachment => ((attachment.title || attachment.text) && !attachment.actions)).map(attachment => {
-      return {
-        content: attachment.title || attachment.text,
-        fileTitle: attachment.author_name,
-        fileUrl: attachment.author_link
-      }
-    }),
-    noOfResultsShown: action.original_message.attachments.length - 2
-    // noOfResults: content.hits.length,
-    // searchParams: params
+  const noOfResultsShown = action.original_message.attachments.length - 2
+  results = action.original_message.attachments.filter(attachment => ((attachment.title || attachment.text) && !attachment.actions)).map(attachment => {
+    return {
+      content: attachment.title || attachment.text,
+      fileTitle: attachment.author_name,
+      fileUrl: attachment.author_link
+    }
+  })
+
+  users.getUserFromSender({ user: action.user.id }, 'slack')
+  .then(user => {
+    const eventData = {
+      // organisationID: user.organisationID,
+      distinct_id: user.objectID,
+      messageID: action.message_ts,
+      userID: action.user.id,
+      userName: action.user.name,
+      channelID: action.channel.id,
+      channelName: action.channel.name,
+      teamID: action.team.id,
+      teamName: action.team.domain,
+      // userID: user.uid,
+      searchQuery: decodeURIComponent(action.callback_id.split('__')[1]),
+      results: results,
+      noOfResultsShown: noOfResultsShown,
+      cardContent: noOfResultsShown === 1 ? results[0].content : null,
+      fileTitle: noOfResultsShown === 1 ? results[0].fileTitle : null,
+      // noOfResults: content.hits.length,
+      // searchParams: params
+    }
+    logger.trace(eventData)
+    track.event('Result Success!', eventData)
   })
 
   // // 2. Post reply to slack on behalf of user
