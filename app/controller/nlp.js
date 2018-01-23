@@ -33,8 +33,9 @@ exports.process = (sender, text, contexts) => new Promise(function(resolve, reje
         logger.trace('DialogFlow Result:', result)
         resolve(result)
       } else {
-        logger.error(response && response.statusCode);
-        logger.error(error);
+        logger.error(response && response.statusCode)
+        logger.error(response && response.statusMessage)
+        logger.error(error)
         // reject(error)
         // Need to handle this properly
         result = {
