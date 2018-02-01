@@ -1,5 +1,5 @@
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'trace'})
+const logger = tracer.colorConsole({level: 'debug'})
 const request = require('request')
 
 exports.process = (sender, text, contexts) => new Promise(function(resolve, reject) {
@@ -23,6 +23,7 @@ exports.process = (sender, text, contexts) => new Promise(function(resolve, reje
       headers: headers,
       body: dataString
     }
+    logger.debug('📡  Sending to DialogFlow:', messageToApiai)
     logger.trace('dataString', dataString)
     logger.trace('options', options)
     function callback(error, response, body) {
@@ -30,7 +31,7 @@ exports.process = (sender, text, contexts) => new Promise(function(resolve, reje
         const result = JSON.parse(body).result
         result.intent = result.metadata.intentName
         result.query = text //Should actually just not rely on query later on
-        logger.trace('DialogFlow Result:', result)
+        logger.debug('🔦  DialogFlow Returned:', { intent: result.intent, parameters: result.parameters })
         resolve(result)
       } else {
         logger.error(response && response.statusCode)

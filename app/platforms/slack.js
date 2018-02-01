@@ -10,7 +10,7 @@ const properties = require('../config/properties.js')
 const users = require('../controller/users')
 
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'trace'})
+const logger = tracer.colorConsole({level: 'debug'})
 // const debug = true
 // const logger = debug ? tracer.colorConsole({level: 'debug'}) : {trace:()=>{},log:()=>{}}
 // tracer.setLevel('error')
@@ -125,7 +125,7 @@ const transformMessage = function(teamInfo, message) {
 
 	message = scopeMessage(teamInfo.__botUserID, message);
 
-	console.log("🔧🔧⚙️🔬 Transforming an API-able message: ", message)
+	logger.trace("🔧🔧⚙️🔬 Transforming an API-able message: ", message)
 
 	return message
 }
@@ -156,7 +156,7 @@ exports.handleMessage = (teamInfo, message) => {
 				return reactionAdded(teamInfo, message, true)
       break
 		default:
-			console.log('Not a message for me! Ignoring this one.')
+			logger.debug('Not a message for me! Ignoring this one.')
 			return new Promise((resolve, reject) => { resolve() })
 	}
 }
@@ -171,7 +171,7 @@ const setTyping = message => sendClientMessage({
 	})
 
 const messageReceived = message => {
-	console.log('😈 CHATBOT listens to:', message)
+	logger.debug('😈 CHATBOT listens to:', message)
 	setTyping(message)
 	// Remove reference to @forgetmenot
 	if(message.text) message.text = message.text.replace(message.formsOfAddress, '')
@@ -253,7 +253,7 @@ const packageAndHandleMessage = (message, context) => new Promise((resolve, reje
 		// 		}]
 		// 	}
 		// })
-		console.log("Packaged a file")
+		logger.debug("Packaged a file")
 	}
 
 	logger.trace("TO API==>", JSON.stringify(messagePackage, null, 2))
@@ -364,10 +364,6 @@ function sendResponseAfterDelay(thisResponse, delay) {
 
   	if(thisResponse.message.quick_replies && thisResponse.message.quick_replies.length > 0) {
   		logger.trace("Adding buttons");
-
-      console.log('thisResponse', thisResponse);
-      console.log('thisResponse.message.cards', thisResponse.message.cards);
-
   	}
 
 
@@ -509,13 +505,11 @@ function sendResponseAfterDelay(thisResponse, delay) {
       params: params
 		}
     if (thisResponse.recipient.platformSpecific.ts) messageData.ts = thisResponse.recipient.platformSpecific.ts
-    console.log(JSON.stringify(messageData))
 		logger.trace('messageData', messageData)
 		sendClientMessage({
 			action: messageData.ts ? 'updateMessage' : 'sendMessage',
 			data: messageData
 		}).then(x => {
-      console.log(messageData);
 			d.resolve(messageData)
 		}).catch(err => d.reject("ERROR Emitted response",err))
 	}, delay);

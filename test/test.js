@@ -1553,8 +1553,126 @@ describe('Bulk', function() {
         assert.equal(result[0].params.attachments[0].title, 'Brand colours:\n\n- Orange: #EF9A3B\n- Pink: #D62459\n- Blue: #409AD5\n- Green: #34BA9C\n- Orange/Red Blend: #EA6466\n- Purple: #645AEF')
       })
     })
-  })
 
+    describe('Search Strategy', function() {
+      const slackKeychain = {
+        bot_access_token: 'xoxb-252522692578-W3sj1kTnLfSKjup8Vc4TTvRm',
+        bot_user_id: 'D7EH3CKCL'
+      }
+      const messageTemplate = {
+        type: 'message',
+        channel: 'D7EH3CKCL',
+        user: 'U04NVHJFD',
+        ts: '1514506085.000191',
+        source_team: 'T04NVHJBK',
+        team: 'T04NVHJBK'
+      }
+      const reactionTemplate = {
+        type: 'reaction_added',
+        user: 'U04NVHJFD',
+        item: {
+          type: 'message',
+          channel: 'C7BQBL138',
+          ts: '1514722340.000081'
+        },
+        item_user: 'U04NVHJFD',
+        event_ts: '1514722424.000052',
+        ts: '1514722424.000052'
+      }
+      const sendSlackMessage = async text => {
+        const message = JSON.parse(JSON.stringify(messageTemplate))
+        message.text = text
+        return await slack.handleMessage(slackKeychain, message)
+      }
+      const sendSlackReaction = async reaction => {
+        const message = JSON.parse(JSON.stringify(reactionTemplate))
+        message.reaction = reaction
+        return await slack.handleMessage(slackKeychain, message)
+      }
+      const searches = [
+        {
+          query: 'What is the purple colour?',
+          correctSnippet: 'brand colours'
+        },
+        {
+          query: 'where is the alpha crm',
+          correctSnippet: 'sales crm - alpha targets'
+        },
+        {
+          query: 'where is the belron application',
+          correctSnippet: 'belron/drive/auto'
+        },
+        {
+          query: 'what are our urgent priority guidelines',
+          correctSnippet: 'These are our Urgent Priority'
+        },
+        {
+          query: 'where is the features scorecard sheet',
+          correctSnippet: 'Feature set: Savvy for Slack'
+        },
+        {
+          query: 'what is slits url',
+          correctSnippet: 'Slite: The note app '
+        },
+        {
+          query: 'what is <http:www.marketingagencies.org.uk|www.marketingagencies.org.uk> contact page',
+          correctSnippet: 'Contact — MAA'
+        },
+        {
+          query: 'where are the public faqs',
+          correctSnippet: 'public faqs'
+        },
+        {
+          query: 'what is included in our 14 day trial',
+          correctSnippet: '14 day trial'
+        },
+        {
+          query: 'what is included in our 14 day free trial',
+          correctSnippet: '14 day trial'
+        },
+        {
+          query: 'where is the astronaut illustration',
+          correctSnippet: 'undraw_Astronaut_0o7w.png'
+        },
+        {
+          query: 'what is alex from geovations email',
+          correctSnippet: 'Name: Alex Wrottesley'
+        },
+        {
+          query: '',
+          correctSnippet: ''
+        },
+        {
+          query: '',
+          correctSnippet: ''
+        },
+        {
+          query: '',
+          correctSnippet: ''
+        },
+        {
+          query: '',
+          correctSnippet: ''
+        },
+      ]
+      searches.filter(search => search.query && search.query.length).forEach(search => {
+        describe('Ask: ' + search.query, function() {
+          var result
+          before(async () => {
+            result = await sendSlackMessage(search.query)
+            return
+          })
+          it('should return: ' + (search.correctAnswer ? search.correctAnswer.substring(0, 50) : '...' + search.correctSnippet.substring(0, 50)) + '...', () => {
+            logger.debug(result[0].params.attachments[0].title.substring(0, 50) + '...')
+            if (search.correctAnswer)
+              assert.equal(result[0].params.attachments[0].title, search.correctAnswer)
+            else
+              assert(search.correctSnippet && search.correctSnippet.length && result[0].params.attachments[0].title.toLowerCase().indexOf(search.correctSnippet.toLowerCase()) > -1)
+          })
+        })
+      })
+    })
+  })
   describe('Database', () => {
     const index = process.env.ALGOLIA_ORG_INDEX
     const data = {

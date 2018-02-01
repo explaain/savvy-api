@@ -22,7 +22,7 @@ const Randoms = require('../controller/cannedResponses.js').Randoms
 
 
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'trace'});
+const logger = tracer.colorConsole({level: 'debug'});
 // tracer.setLevel('error');
 
 const C = {}; // C is for Context
@@ -702,7 +702,7 @@ function intentConfidence(sender, message, extraData) {
   .then(function(res) {
 		if (res.requestData && res.requestData.intent == "Default Fallback Intent")
 			res.requestData.intent = 'query'
-		logger.debug(res)
+		logger.trace(res)
 		d.resolve(res)
   }).catch(function(e) {
     logger.error(e);
@@ -817,7 +817,7 @@ const getResponseMessage = function(data) {
 		// m = prepareResult(sender, m)
 		data.messageData = [{data: createTextMessage(sender, {text: m.resultSentence || m.actionSentence || m.sentence, attachment: m.attachments && m.attachments[0] || null}, quickReplies, { cards: data.memories, filters: data.requestData.filters })}]
 		if (followUp) data.messageData.push({data: followUp, delay: 2000})
-		logger.debug(data.messageData[0].data.message.cards.length)
+		logger.trace(data.messageData[0].data.message.cards.length)
 	}
 
 	// ???

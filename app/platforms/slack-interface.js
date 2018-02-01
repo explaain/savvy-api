@@ -1,5 +1,5 @@
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'trace'})
+const logger = tracer.colorConsole({level: 'debug'})
 const request = require('request')
 const axios = require('axios')
 const SlackBot = require('slackbots')
@@ -80,7 +80,7 @@ exports.oauth = function(req, res) {
   if (!req.query.code) {
       res.status(500);
       res.send({"Error": "Looks like we're not getting code."});
-      console.log("Looks like we're not getting code.");
+      logger.debug("Looks like we're not getting code.");
   } else {
     // If it's there...
 

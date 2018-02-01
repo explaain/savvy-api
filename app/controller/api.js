@@ -12,7 +12,7 @@
 
 
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'trace'})
+const logger = tracer.colorConsole({level: 'debug'})
 // tracer.setLevel('warn');
 const sinon = require('sinon')
 const Q = require("q")
@@ -485,7 +485,7 @@ const routeByIntent = function(requestData) {
 const recallMemory = function(requestData) {
 	logger.trace(recallMemory, requestData)
 	const d = Q.defer()
-	var searchTerm = requestData.query.toLowerCase().replace(/[^\w\s]|_/g, "");// memory.context.map(function(e){return e.value}).join(' ');
+	var searchTerm = requestData.query.toLowerCase().replace(/[^\w\s.]|_/g, " ");// memory.context.map(function(e){return e.value}).join(' ');
   logger.trace(requestData.parameters.extraContext)
   if (typeof requestData.parameters.extraContext !== 'object' && typeof requestData.parameters.extraContext !== 'array') requestData.parameters.extraContext = [requestData.parameters.extraContext]
   logger.trace(requestData.parameters.extraContext)
@@ -603,8 +603,10 @@ const searchForCards = async function(user, params) {
   logger.trace(searchForCards, user, params)
   try {
     const index = user.organisationID + '__Cards'
+    logger.debug('📡  Sending to Algolia:', params)
     const content = await Algolia.connect(AlgoliaParams.appID, user.algoliaApiKey, index).searchObjects(params)
     // const itemCards = await fetchListItemCards(apiKey, index, content.hits) // What do we do with itemCards here?!
+    logger.debug('🔦  Received from Algolia:', content.hits.map(hit => { return { title: hit.title || null, content: (hit.content || hit.description || hit.title || hit.fileTitle).substring(0, 50)+'...', fileTitle: hit.fileTitle || null } }))
     logger.trace('Search Results:', content)
     track.event('Searched', {
       distinct_id: user.uid,

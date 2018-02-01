@@ -1,5 +1,5 @@
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'trace'})
+const logger = tracer.colorConsole({level: 'debug'})
 const sinon = require('sinon')
 const axios = require("axios");
 const track = require('../controller/track')
