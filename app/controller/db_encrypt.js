@@ -25,7 +25,7 @@ exports.getData = async (index, objectID, optionalObject) => {
   if (objectID)
     encryptedData = await Algolia.connect(AlgoliaParams.appID, AlgoliaParams.apiKey, index).getObject(objectID)
   else if (optionalObject) {
-    const filters = Object.keys(optionalObject).map(key => key + ':' + optionalObject[key]).join(' AND ')
+    const filters = Object.keys(optionalObject).map(key => key + ':"' + optionalObject[key] + '"').join(' AND ')
     // const filters = JSON.stringify(optionalObject).replace('{','').replace('}','')
     console.log(filters)
     encryptedData = await Algolia.connect(AlgoliaParams.appID, AlgoliaParams.apiKey, index).getFirstFromSearch({ filters: filters})

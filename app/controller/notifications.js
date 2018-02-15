@@ -46,7 +46,6 @@ exports.subscribe = ({userID, notificationType, PushSubscription}) => {
   return new Promise((resolve, reject) => {
     // Save this to user userID database object
 
-    // api.getDbObject(AlgoliaUsersIndex, userID)
     users.fetchUserDataFromDb(userID)
     .then(user => {
       user.notify = user.notify || { options: {}, routes: []};
@@ -109,11 +108,11 @@ exports.subscribe = ({userID, notificationType, PushSubscription}) => {
     routes : ["browser", "email"] // So you know where it went.
   }
 */
-exports.notify = ({recipientID, type, payload}) => {
+exports.notify = ({recipient, type, payload}) => {
   console.log(1);
   return new Promise((resolve, reject) => {
     constructNotification(type, payload)
-    .then(notification => notifyUser(recipientID, notification))
+    .then(notification => notifyUser(recipient, notification))
     .then(resolve) // Pass args from sendNotification to callback
     .catch(reject)
   })
@@ -133,13 +132,13 @@ function constructNotification(type, payload) {
     // Acquire data to flesh out the notification message
     console.log(payload.userID)
     Promise.all([
-      users.fetchUserDataFromDb(payload.userID),
+      // users.fetchUserDataFromDb(payload.userID),
       // api.getDbObject(AlgoliaUsersIndex, Number(payload.userID)),
       // api.getDbObject(AlgoliaIndex, Number(payload.objectID))
     ])
     .catch((err) => { logger.error(err); reject(err) })
-    .then(([user /*, card*/]) => {
-      console.log("✅ Pulled USER DATA:", user.objectID);
+    .then(([/*user*/ /*, card*/]) => {
+      // console.log("✅ Pulled USER DATA:", user.objectID);
       // console.log("✅ Pulled CARD DATA:", card.objectID);
       console.log(type);
 
@@ -149,6 +148,7 @@ function constructNotification(type, payload) {
           notification.type = type; // For notification icons etc.
           notification.title = 'Card updated!';
           notification.message = payload.message;
+          console.log(notification);
           resolve(notification);
           break;
         case 'CARD_UPDATE_REQUEST':
@@ -170,13 +170,14 @@ function constructNotification(type, payload) {
  * @return {1:Object} notification
  * @return {2:Array} [notifyRoutes]
 */
-function notifyUser(recipientID, notification) {
+function notifyUser(recipient, notification) {
   console.log("\n\nThe notification", notification,"\n\n\n");
 
   return new Promise((resolve, reject) => {
-    users.fetchUserDataFromDb(recipientID)
-    // api.getDbObject(AlgoliaUsersIndex, recipientID)
+    console.log(recipient);
+    users.fetchUserDataFromDb(recipient)
     .then(user => {
+      console.log(123);
       if(!user.notify || !user.notify.routes || user.notify.routes.length === 0) {
         logger.erro("No available notify routes for recipient", user.first_name, recipientID);
         return reject("No available routes");

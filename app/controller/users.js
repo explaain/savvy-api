@@ -209,9 +209,19 @@ exports.addUserToOrganisation = function(organisationID, user, verifiedEmails) {
 }
 
 
-fetchUserDataFromDb = function(userID) {
-	logger.trace('fetchUserDataFromDb', userID)
-	return AlgoliaUsers.getObject(userID)
+fetchUserDataFromDb = function(user) {
+	logger.trace('fetchUserDataFromDb', user)
+  if (typeof user === 'string') {
+    console.log('string!');
+    return AlgoliaUsers.getObject(user)
+  }
+  else {
+    console.log('object!');
+    const filters = Object.keys(user).map(key => key + ':"' + user[key].replace('@',' ') + '"').join(' AND ')
+    console.log(filters);
+    return AlgoliaUsers.getFirstFromSearch({ filters: filters})
+    // return AlgoliaUsers.getFirstFromFilters({ filters: filters})
+  }
 }
 
 

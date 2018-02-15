@@ -23,7 +23,7 @@ router.post('/subscribe', jsonParser, (req,res) => {
 
 router.post('/send', jsonParser, (req,res) => {
   console.log(req.body);
-  if(!req.body || !req.body.recipientID || !req.body.type || !req.body.payload) {
+  if(!req.body || !req.body.recipient || !req.body.type || !req.body.payload) {
     return res.status(400).json({error:
       { id: 'bad-notify-data', message: 'Required subscription info missing'}
     })

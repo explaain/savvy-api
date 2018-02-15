@@ -46,6 +46,7 @@ const Index = class Index {
     logger.trace('getFirstFromSearch', params)
     const self = this
     const res = await self.searchObjects(params)
+    console.log(res);
     return res && res.hits && res.hits.length ? res.hits[0] : null
   }
   async saveObject(user, object) {
