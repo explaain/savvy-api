@@ -2,7 +2,7 @@ var notifications = require('../controller/notifications.js');
 var express = require('express');
 var request = require('request');
 var bodyParser = require('body-parser');
-var jsonParser = bodyParser.json();
+var jsonParser = bodyParser.json({strict: false});
 var router = express.Router();
 
 router.post('/subscribe', jsonParser, (req,res) => {

@@ -3,6 +3,7 @@ require('dotenv').config();
 const tracer = require('tracer')
 const logger = tracer.colorConsole({level: 'info'});
 // DB
+const axios = require('axios')
 const properties = require('../config/properties.js');
 const AlgoliaSearch = require('algoliasearch');
 const AlgoliaClient = AlgoliaSearch(properties.algolia_app_id, properties.algolia_api_key,{ protocol: 'https:' });
@@ -10,7 +11,8 @@ const AlgoliaIndex = AlgoliaClient.initIndex(process.env.ALGOLIA_INDEX);
 const AlgoliaUsersIndex = AlgoliaClient.initIndex(properties.algolia_users_index);
 // Algolia setup
 const uuidv4 = require('uuid/v4');
-const ForgetMeNotAPI = require('./api');
+const api = require('./api');
+const users = require('./users');
 
 // Notifications config
 // firebase-adminsdk-q1d7p@forgetmenot-55f96.iam.gserviceaccount.com
@@ -44,7 +46,8 @@ exports.subscribe = ({userID, notificationType, PushSubscription}) => {
   return new Promise((resolve, reject) => {
     // Save this to user userID database object
 
-    ForgetMeNotAPI.getDbObject(AlgoliaUsersIndex, userID)
+    // api.getDbObject(AlgoliaUsersIndex, userID)
+    users.fetchUserDataFromDb(userID)
     .then(user => {
       user.notify = user.notify || { options: {}, routes: []};
 
@@ -107,6 +110,7 @@ exports.subscribe = ({userID, notificationType, PushSubscription}) => {
   }
 */
 exports.notify = ({recipientID, type, payload}) => {
+  console.log(1);
   return new Promise((resolve, reject) => {
     constructNotification(type, payload)
     .then(notification => notifyUser(recipientID, notification))
@@ -119,25 +123,35 @@ exports.notify = ({recipientID, type, payload}) => {
 function constructNotification(type, payload) {
   return new Promise((resolve, reject) => {
     // Basic identification
+    console.log(2);
     let notification = {
       id: uuidv4(),
       date: Date.now().toString()
     }
+    console.log(notification);
 
     // Acquire data to flesh out the notification message
+    console.log(payload.userID)
     Promise.all([
-      ForgetMeNotAPI.getDbObject(AlgoliaUsersIndex, Number(payload.userID)),
-      ForgetMeNotAPI.getDbObject(AlgoliaIndex, Number(payload.objectID))
+      users.fetchUserDataFromDb(payload.userID),
+      // api.getDbObject(AlgoliaUsersIndex, Number(payload.userID)),
+      // api.getDbObject(AlgoliaIndex, Number(payload.objectID))
     ])
     .catch((err) => { logger.error(err); reject(err) })
-    .then(([user, card]) => {
+    .then(([user /*, card*/]) => {
       console.log("✅ Pulled USER DATA:", user.objectID);
-      console.log("✅ Pulled CARD DATA:", card.objectID);
+      // console.log("✅ Pulled CARD DATA:", card.objectID);
       console.log(type);
 
       switch(type) {
 
         case 'CARD_UPDATED':
+          notification.type = type; // For notification icons etc.
+          notification.title = 'Card updated!';
+          notification.message = payload.message;
+          resolve(notification);
+          break;
+        case 'CARD_UPDATE_REQUEST':
           notification.type = type; // For notification icons etc.
           notification.title = 'Card update request';
           notification.message = `${user.first_name} wants to update a card: ${card.sentence}`;
@@ -160,7 +174,8 @@ function notifyUser(recipientID, notification) {
   console.log("\n\nThe notification", notification,"\n\n\n");
 
   return new Promise((resolve, reject) => {
-    ForgetMeNotAPI.getDbObject(AlgoliaUsersIndex, recipientID)
+    users.fetchUserDataFromDb(recipientID)
+    // api.getDbObject(AlgoliaUsersIndex, recipientID)
     .then(user => {
       if(!user.notify || !user.notify.routes || user.notify.routes.length === 0) {
         logger.erro("No available notify routes for recipient", user.first_name, recipientID);
@@ -168,6 +183,9 @@ function notifyUser(recipientID, notification) {
       }
 
       let notificationQuests = [];
+      console.log(notificationQuests)
+      console.log(user)
+      console.log(user.notify.routes)
 
       user.notify.routes.filter(r => r.enabled).forEach(route => {
         console.log("➡️ Attempting notification via: ",route)
@@ -180,7 +198,10 @@ function notifyUser(recipientID, notification) {
       .then((routes) => { console.log("✅ All routes"); resolve({notification, routes}) })
       .catch(reject);
 
-    });
+    }).catch((error) => {
+      console.log("Error fetching user", error);
+      reject(error);
+    })
   });
 }
 
@@ -228,6 +249,14 @@ function pushNotification(user, route, notification) {
           reject(error);
         });
         break;
+
+      case 'slack':
+        // @TODO: figure out how to insert the base url here!!
+        axios.post('http://savvy-api--live.herokuapp.com/webhook/slack/notify', {
+          organisationID: user.organisationID,
+          recipient: user.slack,
+      		text: notification.message,
+        })
 
       // case 'native': // Native notifications: https://github.com/mikaelbr/node-notifier
       //   resolve('native');

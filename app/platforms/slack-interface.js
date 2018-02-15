@@ -1,5 +1,5 @@
 const tracer = require('tracer')
-const logger = tracer.colorConsole({level: 'debug'})
+const logger = tracer.colorConsole({level: 'trace'})
 const request = require('request')
 const axios = require('axios')
 const SlackBot = require('slackbots')
@@ -28,6 +28,19 @@ const getOrg = async teamID => {
   else {
     Orgs[teamID] = await Encrypt.getData(SlackAuthIndex, teamID)
     return Orgs[teamID]
+  }
+}
+const getOrgFromName = async organisationID => {
+  logger.trace(getOrg, organisationID)
+  const existingOrg = Orgs.filter(org => org.name === organisationID)
+  if (existingOrg.length)
+    return existingOrg[0]
+  else {
+    const newOrg = await Encrypt.getData(SlackAuthIndex, null, {
+      name: organisationID
+    })
+    Orgs[newOrg.objectID] = newOrg
+    return newOrg
   }
 }
 const getAllOrgs = async () => {
@@ -213,6 +226,22 @@ exports.events = function(req, res) {
   // if (!verifySlack(req.body.payload.token)) return
 
   res.send({challenge: req.body.challenge})
+}
+
+exports.notify = async function(req, res) {
+  console.log('notify!')
+  console.log('Here is the message for slack: ', req.body.text)
+  team = await getOrgFromName(req.body.organisationID)
+  console.log(team)
+  const message = {
+    teamID: team.slack.teamID,
+    recipient: req.body.recipient,
+		text: req.body.text,
+    params: {}
+  }
+  console.log(message)
+  sendMessage(message)
+  res.send({ success: true })
 }
 
 

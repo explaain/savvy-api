@@ -14,5 +14,6 @@ router.post('/', messengerController.handleMessage)
 router.get('/slack/oauth', slackInterface.oauth)
 router.post('/slack/interactive', slackInterface.interactive)
 router.post('/slack/events', slackInterface.events)
+router.post('/slack/notify', slackInterface.notify)
 
 module.exports = router
