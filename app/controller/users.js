@@ -217,7 +217,7 @@ fetchUserDataFromDb = function(user) {
   }
   else {
     console.log('object!');
-    const filters = Object.keys(user).map(key => key + ':"' + user[key].replace('@',' ') + '"').join(' AND ')
+    const filters = Object.keys(user).map(key => key + ':\'' + user[key] + '\'').join(' AND ')
     console.log(filters);
     return AlgoliaUsers.getFirstFromSearch({ filters: filters})
     // return AlgoliaUsers.getFirstFromFilters({ filters: filters})
