@@ -31,6 +31,7 @@ exports.process = (sender, text, contexts) => new Promise(function(resolve, reje
         const result = JSON.parse(body).result
         result.intent = result.metadata.intentName
         result.query = text //Should actually just not rely on query later on
+        result.dialogFlowSuccess = true
         logger.debug('🔦  DialogFlow Returned:', { intent: result.intent, parameters: result.parameters })
         resolve(result)
       } else {
@@ -45,7 +46,8 @@ exports.process = (sender, text, contexts) => new Promise(function(resolve, reje
           parameters: {
             extraContext: '',
             preferredCardType: ''
-          }
+          },
+          dialogFlowSuccess: false
         }
         resolve(result)
       }

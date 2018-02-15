@@ -511,7 +511,10 @@ const recallMemory = function(requestData) {
     if (requestData.filters.type && requestData.filters.type.length && requestData.filters.type !== 'all')
       searchParams.filters = 'type: "' + requestData.filters.type + '"'
     logger.trace(searchParams)
-    return searchForCards(requestData.sender, searchParams)
+    metadata = {
+      dialogFlowSuccess: requestData.dialogFlowSuccess
+    }
+    return searchForCards(requestData.sender, searchParams, metadata)
 	}).then(function(content) {
 		if (!content.hits.length) {
       logger.trace('No results found')
@@ -599,7 +602,7 @@ const saveMemory = function(m, requestData) {
 }
 
 
-const searchForCards = async function(user, params) {
+const searchForCards = async function(user, params, metadata) {
   logger.trace(searchForCards, user, params)
   try {
     const index = user.organisationID + '__Cards'
@@ -626,6 +629,7 @@ const searchForCards = async function(user, params) {
       cardType: content.hits.length === 1 ? content.hits[0].type : null,
       cardModified: content.hits.length === 1 ? content.hits[0].modified : null,
       cardCreated: content.hits.length === 1 ? content.hits[0].created : null,
+      dialogFlowSuccess: metadata.dialogFlowSuccess,
     })
     return content
   } catch (e) {
@@ -668,6 +672,7 @@ const saveToDb = function(user, card, requestData) {
       cardType: 'manual',
       cardModified: data.modified,
       cardCreated: data.created,
+      dialogFlowSuccess: requestData.dialogFlowSuccess
     })
 		logger.trace('User card updated successfully!')
     d.resolve()
