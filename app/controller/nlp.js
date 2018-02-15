@@ -5,7 +5,7 @@ const request = require('request')
 exports.process = (sender, text, contexts) => new Promise(function(resolve, reject) {
   logger.trace('process', sender, text, contexts)
   try {
-    const messageToApiai = text.substring(0, 256).replace(/\'/g, '\\\'').replace(/([\uE000-\uF8FF]|\uD83C[\uDF00-\uDFFF]|\uD83D[\uDC00-\uDDFF])/g, '').replace(/\/|\*/gi,''); // Only sends API.AI the first 256 characters as it can't handle more than that
+    const messageToApiai = text.substring(0, 255).replace(/\'/g, '\\\'').replace(/([\uE000-\uF8FF]|\uD83C[\uDF00-\uDFFF]|\uD83D[\uDC00-\uDDFF])/g, '').replace(/\/|\*/gi,'').substring(0, 255); // Only sends API.AI the first 256 characters as it can't handle more than that
     const headers = {
       'Content-Type': 'application/json; charset=utf-8',
       'Authorization': 'Bearer ' + process.env.DIALOGFLOW_CLIENT_ACCESS_TOKEN

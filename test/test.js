@@ -1639,8 +1639,8 @@ describe('Bulk', function() {
           correctSnippet: 'Name: Alex Wrottesley'
         },
         {
-          query: '',
-          correctSnippet: ''
+          query: 'where is the savvy pitch deck for belron',
+          correctSnippet: 'pitch deck (belron)'
         },
         {
           query: '',
