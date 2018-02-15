@@ -42,6 +42,10 @@ exports.process = (sender, text, contexts) => new Promise(function(resolve, reje
         result = {
           intent: 'query',
           query: text,
+          parameters: {
+            extraContext: '',
+            preferredCardType: ''
+          }
         }
         resolve(result)
       }
