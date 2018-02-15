@@ -252,7 +252,7 @@ function pushNotification(user, route, notification) {
 
       case 'slack':
         // @TODO: figure out how to insert the base url here!!
-        axios.post('http://savvy-api--live.herokuapp.com/webhook/slack/notify', {
+        axios.post('https://savvy-api--live.herokuapp.com/webhook/slack/notify', {
           organisationID: user.organisationID,
           recipient: user.slack,
       		text: notification.message,
