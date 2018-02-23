@@ -32,6 +32,11 @@ const Firebase = require('../controller/db_firebase')
 const uploader = require('../controller/uploader')
 const sifter = require('../controller/sifter')
 
+const data = {
+  title: '3',
+  description: '33',
+}
+sifter.save(data)
 
 // Algolia setup
 const AlgoliaParams = {
