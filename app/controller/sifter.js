@@ -16,5 +16,4 @@ exports.save = data => {
     text: text,
   }
   sgMail.send(msg)
-  console.log('SENT???')
 }
