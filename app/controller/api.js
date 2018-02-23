@@ -30,6 +30,7 @@ const nlp = require('../controller/nlp')
 const Algolia = require('../controller/db_algolia')
 const Firebase = require('../controller/db_firebase')
 const uploader = require('../controller/uploader')
+const sifter = require('../controller/sifter')
 
 
 // Algolia setup
@@ -182,7 +183,7 @@ exports.deleteMemories = (sender, apiKey, organisationID, objectID) => new Promi
  * @return {Object}
  */
 exports.acceptRequest = async function(req) {
-  logger.trace('acceptRequest', req)
+  logger.debug('acceptRequest', req)
   try {
     // req.verified allows platforms/slack.js to verify with a Slack-specific method - if we need to do Firebase-related stuff maybe we should check here too! But for that we'll need some sort of Firebase auth token (normally found only in browser?)...
     var user = await users.getUserFromSender(req.sender, req.platform)
@@ -193,11 +194,18 @@ exports.acceptRequest = async function(req) {
     if (user) req.sender = user
     if (req.platform !== 'slack') {
       await users.authenticateSender(req.sender)
-      await users.checkPermissions(req.organisationID, req.sender)
+      // @TODO: Add this back in somehow! (It currently uses Firebase Functions, which check user is in the organisation in the Firebase Sifrestore database - this means it won't currently work, because the user data is mainly in Algolia!)
+      // await users.checkPermissions(req.organisationID, req.sender)
     }
-    const nlpData = await nlp.process(req.sender, req.text, req.contexts)
-    req = combineObjects(req, nlpData)
+    if (!req.intent) { // @TODO: Check making this conditional doesn't break anything!
+      const nlpData = await nlp.process(req.sender, req.text, req.contexts)
+      req = combineObjects(req, nlpData)
+    }
+    console.log('req')
+    console.log(req)
     const result = await routeByIntent(req)
+    console.log('result')
+    console.log(result)
     if (!result.statusCode) result.statusCode = 200 //temp
     logger.trace('Returning from API:', result)
     return result
@@ -358,7 +366,7 @@ const routeByIntent = function(requestData) {
         }
 				if (memory.triggerURL) {
 					if (Array.isArray(memory.triggerURL)) memory.triggerURL = memory.triggerURL[0]
-					memory.actionSentence = getActionSentence2(memory.content.description, memory.context)
+					memory.actionSentence = getActionSentence2(memory.description || memory.content.description, memory.context)
           logger.info(memory.actionSentence)
           data.memories = [memory]
 					saveMemory(memory, requestData)
@@ -395,7 +403,7 @@ const routeByIntent = function(requestData) {
 				memory.reminderRecipient = requestData.sender;
 				if (dateTimeOriginal) {
           // memory.actionSentence = getActionSentence(memory.sentence, memory.context)
-          const actionText = rewriteSentence(memory.content.description, true)
+          const actionText = rewriteSentence(memory.description || memory.content.description, true)
           memory.actionSentence = getEmojis(actionText) + ' ' + actionText;
           memory.triggerDateTimeNumeric = getDateTimeNum(dateTimeOriginal, dateTimeMemory)
     			memory.triggerDateTime = new Date(memory.triggerDateTimeNumeric);
@@ -639,10 +647,9 @@ const searchForCards = async function(user, params, metadata) {
 }
 
 
-const saveToDb = function(user, card, requestData) {
+const saveToDb = async function(user, card, requestData) {
   /* Temporarily replacing all Slack userIDs with ACME userID */ if(card.userID.length < 10) card.userID = '101118387301286232222'
   logger.trace(saveToDb, user, card, requestData)
-	const d = Q.defer();
 	card.dateCreated = Date.now()
   card.description = card.description.replace(/^remember that /i, '').replace(/^remember /i, '')
   card.description = card.description.charAt(0).toUpperCase() + card.description.slice(1)
@@ -653,34 +660,31 @@ const saveToDb = function(user, card, requestData) {
     description: card.description,
     authorID: user.uid,
     created: parseInt(new Date().getTime()/1000),
-    modified: parseInt(new Date().getTime()/1000)
+    modified: parseInt(new Date().getTime()/1000),
+    service: typeof requestData.service == 'string' ? requestData.service : null
   }
   if (card.title) data.title = card.title
   logger.trace('💎  Here\'s the data:', data)
-  Algolia.connect(AlgoliaParams.appID, user.algoliaApiKey, user.organisationID + '__Cards').saveObject(user, data)
-  .then(function(response) {
-    logger.trace('📪  The response!', response)
-    if (!data.objectID) data.objectID = response.objectID
-    track.event('Card Saved', {
-      distinct_id: data.authorID,
-      organisationID: data.organisationID,
-      userID: data.authorID,
-      card: data,
-      cardID: data.objectID,
-      cardContent: card.description,
-      cardTitle: card.title,
-      cardType: 'manual',
-      cardModified: data.modified,
-      cardCreated: data.created,
-      dialogFlowSuccess: requestData.dialogFlowSuccess
-    })
-		logger.trace('User card updated successfully!')
-    d.resolve()
-  }).catch(function(e) {
-    console.log('📛  Error!', e);
-    d.reject()
+  response = await Algolia.connect(AlgoliaParams.appID, user.algoliaApiKey, user.organisationID + '__Cards').saveObject(user, data)
+  logger.trace('📪  The response!', response)
+  if (!data.objectID) data.objectID = response.objectID
+  track.event('Card Saved', {
+    distinct_id: data.authorID,
+    organisationID: data.organisationID,
+    userID: data.authorID,
+    card: data,
+    cardID: data.objectID,
+    cardContent: card.description,
+    cardTitle: card.title,
+    cardType: 'manual',
+    cardModified: data.modified,
+    cardCreated: data.created,
+    dialogFlowSuccess: requestData.dialogFlowSuccess
   })
-	return d.promise;
+	logger.trace('User card updated successfully!')
+  if (data.service === 'sifter')
+    sifter.save(data)
+	return
 }
 // const updateDb = function(user, memory, requestData) {
 //   logger.trace(updateDb, user, memory, requestData)
@@ -731,7 +735,7 @@ const getDateTimeNum = function(dateTimeOriginal, memory) {
 
   // Trying out replacing all the above with Sherlock
 
-  var sherlockTime = Sherlock.parse(memory.content.description).startDate
+  var sherlockTime = Sherlock.parse(memory.description || memory.content.description).startDate
   if (!sherlockTime.hasMeridian && sherlockTime.getHours() > 12) {
     sherlockAmTime = new Date(sherlockTime - 43200000)
     if (sherlockAmTime.getHours() > 7 && sherlockAmTime > new Date()) {
@@ -982,7 +986,7 @@ const getWrittenMemory = function(requestData) {
   //   description: rewriteSentence(requestData.query),
   //   listItems: requestData.listItems,
   // }
-  memory.description = rewriteSentence(requestData.query)
+  memory.description = rewriteSentence(requestData.query || requestData.description)
   if (requestData.title) memory.title = requestData.title
   if (requestData.listItems) memory.listItems = requestData.listItems
   memory.extractedFrom = requestData.extractedFrom

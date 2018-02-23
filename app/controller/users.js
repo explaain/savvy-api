@@ -5,6 +5,13 @@ const axios = require("axios");
 const track = require('../controller/track')
 const Algolia = require('../controller/db_algolia')
 
+var FirebaseAdmin = require("firebase-admin")
+var serviceAccount = require("./firebaseKeySavvy.json") // Secret file
+FirebaseAdmin.initializeApp({
+  credential: FirebaseAdmin.credential.cert(serviceAccount),
+  databaseURL: "https://savvy-96d8b.firebaseio.com"
+}, 'savvy') // Giving it a name so we're allowed to have this alongside the existing app (forgetmenot) - need to consolidate!
+
 if (process.env.NODE_ENV === "test") {
   const sandbox = sinon.sandbox.create()
   const testUser = {
@@ -40,7 +47,7 @@ const AlgoliaOrgs = new Algolia.Index(process.env.ALGOLIA_APP, process.env.ALGOL
  * @return {Object}
  */
 exports.getUserFromSender = async function(sender, platform) {
-  logger.trace('getUserFromSender', sender, platform)
+  logger.debug('getUserFromSender', sender, platform)
   const platformSpecificID = sender[{
     slack: 'user',
     default: 'uid'
@@ -50,6 +57,7 @@ exports.getUserFromSender = async function(sender, platform) {
       filters: platform + ': ' + platformSpecificID
     }) : await AlgoliaUsers.getObject(platformSpecificID)
     user.uid = user.objectID
+    user.idToken = sender.idToken
     user.platformSpecific = sender
     // delete user.objectID
     delete user._highlightResult
@@ -61,6 +69,7 @@ exports.getUserFromSender = async function(sender, platform) {
 }
 
 exports.authenticateSender = user => new Promise((resolve, reject) => {
+  logger.debug('authenticateSender', user)
   // var error
   if (!user) throw new Error('No user data provided')
   if (!user.uid) throw new Error('No user uid provided')
@@ -104,6 +113,8 @@ exports.checkPermissions = function(organisationID, user) {
       logger.error(error)
       const e = { statusCode: 400, message: '❌ 🔑  User permission checking failed' }
       logger.error(e.message)
+      logger.debug('[FOR DEBUGGING] organisationID:', organisationID)
+      logger.debug('[FOR DEBUGGING] user:', user)
       reject(e)
     })
   })
