@@ -58,6 +58,7 @@ exports.getUserFromSender = async function(sender, platform) {
     }) : await AlgoliaUsers.getObject(platformSpecificID)
     user.uid = user.objectID
     user.idToken = sender.idToken
+    if (sender.role) user.role = sender.role
     user.platformSpecific = sender
     // delete user.objectID
     delete user._highlightResult

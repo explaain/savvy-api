@@ -325,8 +325,8 @@ const routeByIntent = function(requestData) {
 		case "store":
       // logger.info(memory)
 			saveMemory(memory, requestData)
-			.then(function() {
-				d.resolve(data)
+			.then(function(card) {
+				d.resolve({ card: card })
 			}).catch(function(e) {
 				logger.error(e);
 				d.reject(e)
@@ -597,10 +597,33 @@ const saveMemory = function(m, requestData) {
     //   // logger.info(m)
 		// 	return updateDb(requestData.sender, m, requestData)
 		// } else {
-			return saveToDb(requestData.sender, m, requestData)
-		// }
-	}).then(function(m) {
-		d.resolve(m)
+    const card = JSON.parse(JSON.stringify(requestData))
+    card.description = card.description.replace(/^remember that /i, '').replace(/^remember /i, '')
+    card.description = card.description.charAt(0).toUpperCase() + card.description.slice(1)
+    if (card.sender) delete card.sender
+    if (card.intent) delete card.intent
+    if (card.generalIntent) delete card.generalIntent
+    if (card.modified) delete card.modified
+    if (card.allInOne) delete card.allInOne
+    if (requestData.service && requestData.service) {
+      card.type = 'file' // @TODO: We're assuming this! Fix!
+    }
+    // @TODO: Maybe have user choose a source so we can send card.source?
+    const author = {
+      objectID: requestData.sender.objectID,
+      name: requestData.sender.first + ' ' + requestData.sender.last,
+      organisationID: requestData.sender.organisationID,
+      role: requestData.sender.role,
+    }
+    console.log('card!!!!!!')
+    console.log(card)
+    // return axios.post('http://localhost:5050/save-card', { card: card, author: author })
+    return axios.post('https://savvy-nlp--staging.herokuapp.com/save-card', { card: card, author: author })
+	}).then(function(res) {
+    const card = res.data.card
+    console.log('Returned Card')
+    console.log(card)
+		d.resolve(card)
 	}).catch(function(e) {
 		logger.error(e);
 		d.reject(e)
@@ -650,14 +673,12 @@ const saveToDb = async function(user, card, requestData) {
   /* Temporarily replacing all Slack userIDs with ACME userID */ if(card.userID.length < 10) card.userID = '101118387301286232222'
   logger.trace(saveToDb, user, card, requestData)
 	card.dateCreated = Date.now()
-  card.description = card.description.replace(/^remember that /i, '').replace(/^remember /i, '')
-  card.description = card.description.charAt(0).toUpperCase() + card.description.slice(1)
 
   const data = {
     objectID: card.objectID || null,
     title: card.title,
     description: card.description,
-    authorID: user.uid,
+    creatorID: user.uid,
     created: parseInt(new Date().getTime()/1000),
     modified: parseInt(new Date().getTime()/1000),
     service: typeof requestData.service == 'string' ? requestData.service : null
@@ -668,9 +689,9 @@ const saveToDb = async function(user, card, requestData) {
   logger.trace('📪  The response!', response)
   if (!data.objectID) data.objectID = response.objectID
   track.event('Card Saved', {
-    distinct_id: data.authorID,
+    distinct_id: data.creatorID,
     organisationID: data.organisationID,
-    userID: data.authorID,
+    userID: data.creatorID,
     card: data,
     cardID: data.objectID,
     cardContent: card.description,
