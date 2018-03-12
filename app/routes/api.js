@@ -20,10 +20,10 @@ router.post('/memories', function(req, res) {
 	});
 });
 router.delete('/memories', function(req, res) {
-	const sender = req.query.sender;
-	const organisationID = req.query.organisationID;
-	const objectID = req.query.objectID;
-	apiController.deleteMemories(sender, organisationID, objectID)
+  const data = req.query
+  data.intent = 'delete'
+  data.sender = JSON.parse(data.sender)
+	apiController.acceptRequest(data)
 	.then(function(result) {
 		res.status(200).send(result);
 	}).catch(function(e) {
@@ -33,6 +33,18 @@ router.delete('/memories', function(req, res) {
 });
 router.get('/memories', function(req, res) {
   res.status(200).send('Hi there')
+});
+router.post('/verify', function(req, res) {
+  const data = req.body;
+  data.intent = 'verify'
+  apiController.acceptRequest(data)
+  .then(function(results) {
+		res.status(200).send(results);
+	}).catch(function(e) {
+    console.log(req.body);
+    console.error(e)
+		res.status(e.code).send(data)
+	});
 });
 
 router.post('/import', function(req, res) {

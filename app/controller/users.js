@@ -52,6 +52,7 @@ exports.getUserFromSender = async function(sender, platform) {
     slack: 'user',
     default: 'uid'
   }[platform || 'default']]
+  console.log('platformSpecificID:', platformSpecificID);
   try {
     const user = platform ? await AlgoliaUsers.getFirstFromSearch({
       filters: platform + ': ' + platformSpecificID
@@ -226,8 +227,7 @@ fetchUserDataFromDb = function(user) {
   if (typeof user === 'string') {
     console.log('string!');
     return AlgoliaUsers.getObject(user)
-  }
-  else {
+  } else {
     console.log('object!');
     const filters = Object.keys(user).map(key => key + ':\'' + user[key] + '\'').join(' AND ')
     console.log(filters);

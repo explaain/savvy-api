@@ -157,6 +157,7 @@ const sendClientMessage = function(data) {
 	return d.promise
 }
 
+// @TODO: Remove this and use exports.acceptRequest()
 exports.deleteMemories = (sender, apiKey, organisationID, objectID) => new Promise(function(resolve, reject) {
   logger.trace('deleteMemories', sender, apiKey, organisationID, objectID)
   Algolia.connect(sender, apiKey, organisationID + '__Cards').deleteObject(objectID)
@@ -200,9 +201,17 @@ exports.acceptRequest = async function(req) {
       const nlpData = await nlp.process(req.sender, req.text, req.contexts)
       req = combineObjects(req, nlpData)
     }
-    console.log('req')
-    console.log(req)
-    const result = await routeByIntent(req)
+    var result
+    switch (req.intent) {
+      case 'verify':
+        result = await verifyCard(req)
+        break
+      case 'delete':
+        result = await deleteCard(req)
+        break
+      default:
+        result = await routeByIntent(req)
+    }
     console.log('result')
     console.log(result)
     if (!result.statusCode) result.statusCode = 200 //temp
@@ -598,8 +607,10 @@ const saveMemory = function(m, requestData) {
 		// 	return updateDb(requestData.sender, m, requestData)
 		// } else {
     const card = JSON.parse(JSON.stringify(requestData))
-    card.description = card.description.replace(/^remember that /i, '').replace(/^remember /i, '')
-    card.description = card.description.charAt(0).toUpperCase() + card.description.slice(1)
+    if (card.description) {
+      card.description = card.description.replace(/^remember that /i, '').replace(/^remember /i, '')
+      card.description = card.description.charAt(0).toUpperCase() + card.description.slice(1)
+    }
     if (card.sender) delete card.sender
     if (card.intent) delete card.intent
     if (card.generalIntent) delete card.generalIntent
@@ -614,11 +625,12 @@ const saveMemory = function(m, requestData) {
       name: requestData.sender.first + ' ' + requestData.sender.last,
       organisationID: requestData.sender.organisationID,
       role: requestData.sender.role,
+      topics: requestData.sender.topics,
     }
     console.log('card!!!!!!')
     console.log(card)
-    // return axios.post('http://localhost:5050/save-card', { card: card, author: author })
     return axios.post('https://savvy-nlp--staging.herokuapp.com/save-card', { card: card, author: author })
+    // return axios.post('http://localhost:5050/save-card', { card: card, author: author })
 	}).then(function(res) {
     const card = res.data.card
     console.log('Returned Card')
@@ -739,6 +751,20 @@ const saveToDb = async function(user, card, requestData) {
 exports.fetchUserDataFromDb = users.fetchUserDataFromDb;
 
 
+
+const verifyCard = async req => {
+  const res = await axios.post('https://savvy-nlp--staging.herokuapp.com/verify-card', { objectID: req.objectID, author: req.sender, prop: req.prop, approve: req.approve })
+  // const res = await axios.post('http://localhost:5050/verify-card', { objectID: req.objectID, author: req.sender, prop: req.prop, approve: req.approve })
+  const result = res.data
+  return result
+}
+
+const deleteCard = async req => {
+  const res = await axios.post('https://savvy-nlp--staging.herokuapp.com/delete-card', { card: { objectID: req.objectID }, author: req.sender })
+  // const res = await axios.post('http://localhost:5050/delete-card', { card: { objectID: req.objectID }, author: req.sender })
+  const result = res.data
+  return result
+}
 
 
 const getDateTimeNum = function(dateTimeOriginal, memory) {
@@ -899,7 +925,9 @@ const getActionSentence = function(sentence, context, reminder) {
 }
 
 function rewriteSentence(originalSentence, reminder) { // Currently very primitive!
-	logger.trace(rewriteSentence);
+  logger.debug(originalSentence);
+  if (!originalSentence)
+    return null
   var sentence = JSON.parse(JSON.stringify(originalSentence))
 	sentence = sentence.trim().replace(/’/g, '\'');
   // const remove1 = [
