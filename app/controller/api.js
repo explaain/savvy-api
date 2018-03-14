@@ -199,9 +199,10 @@ exports.acceptRequest = async function(req) {
     }
     var card = {}
     console.log('card 1', card)
+    if (req.intent === 'store') card = req
     if (!req.intent) { // @TODO: Check making this conditional doesn't break anything!
       const nlpData = await nlp.process(req.sender, req.text, req.contexts)
-      if (nlpData['intent'] === 'store') card = req
+      if (nlpData.intent === 'store') card = req
       req = combineObjects(req, nlpData)
     }
     var result
