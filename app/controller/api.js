@@ -341,7 +341,7 @@ const routeByIntent = function(requestData, card) {
       console.log('card 4', card)
 			saveMemory(memory, requestData, card)
 			.then(function(card) {
-				d.resolve({ card: card })
+				d.resolve({ card: card, requestData: requestData })
 			}).catch(function(e) {
 				logger.error(e);
 				d.reject(e)
@@ -615,7 +615,10 @@ const saveMemory = function(m, requestData, tempCard) {
 		// } else {
     console.log('card 6', tempCard)
     const card = JSON.parse(JSON.stringify(tempCard))
-    if (!card.description && requestData.text) card.description = requestData.text
+    if (!card.description && card.text){
+      card.description = card.text
+      delete card.text
+    }
     if (card.description) {
       card.description = card.description.replace(/^remember that /i, '').replace(/^remember /i, '')
       card.description = card.description.charAt(0).toUpperCase() + card.description.slice(1)
