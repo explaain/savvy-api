@@ -198,6 +198,7 @@ exports.acceptRequest = async function(req) {
       // await users.checkPermissions(req.organisationID, req.sender)
     }
     var card = {}
+    console.log('card 1', card)
     if (!req.intent) { // @TODO: Check making this conditional doesn't break anything!
       const nlpData = await nlp.process(req.sender, req.text, req.contexts)
       if (nlpData['intent'] === 'store') card = req
@@ -212,6 +213,7 @@ exports.acceptRequest = async function(req) {
         result = await deleteCard(req)
         break
       default:
+        console.log('card 2', card)
         result = await routeByIntent(req, card)
     }
     console.log('result')
@@ -308,6 +310,7 @@ exports.fetchMixpanelData = function(data) {
 
 const routeByIntent = function(requestData, card) {
 	logger.trace(routeByIntent, requestData)
+  console.log('card 3', card)
 	const d = Q.defer()
   var memory = {}
   if (requestData.intent == 'setTask') requestData.intent = 'setTask.dateTime' //temporary
@@ -335,6 +338,7 @@ const routeByIntent = function(requestData, card) {
 
 		case "store":
       // logger.info(memory)
+      console.log('card 4', card)
 			saveMemory(memory, requestData, card)
 			.then(function(card) {
 				d.resolve({ card: card })
@@ -563,7 +567,8 @@ const recallMemory = function(requestData) {
 	return d.promise
 }
 
-const saveMemory = function(m, requestData, card) {
+const saveMemory = function(m, requestData, tempCard) {
+  console.log('card 5', tempCard)
 	logger.trace()
 	const d = Q.defer()
 	m.hasAttachments = !!(m.attachments) /* @TODO: investigate whether brackets are needed */
@@ -608,7 +613,8 @@ const saveMemory = function(m, requestData, card) {
     //   // logger.info(m)
 		// 	return updateDb(requestData.sender, m, requestData)
 		// } else {
-    const card = JSON.parse(JSON.stringify(card))
+    console.log('card 6', tempCard)
+    const card = JSON.parse(JSON.stringify(tempCard))
     if (!card.description && requestData.text) card.description = requestData.text
     if (card.description) {
       card.description = card.description.replace(/^remember that /i, '').replace(/^remember /i, '')
