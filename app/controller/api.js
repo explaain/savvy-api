@@ -664,8 +664,8 @@ const searchForCards = async function(user, params, metadata) {
     logger.debug('📡  Sending to Algolia:', params)
     const content = await Algolia.connect(AlgoliaParams.appID, user.algoliaApiKey, index).searchObjects(params)
     // const itemCards = await fetchListItemCards(apiKey, index, content.hits) // What do we do with itemCards here?!
-    logger.debug('🔦  Received from Algolia:', content.hits.map(hit => { return { title: hit.title || null, content: (hit.content || hit.description || hit.title || hit.fileTitle).substring(0, 50)+'...', fileTitle: hit.fileTitle || null } }))
-    logger.trace('Search Results:', content)
+    logger.debug('🔦  Received from Algolia:', content.hits.map(hit => { return { title: hit.title || null, content: (hit.content || hit.description || hit.title || hit.fileTitle || '').substring(0, 50)+'...', fileTitle: hit.fileTitle || null } }))
+    logger.debug('Search Results:', content)
     track.event('Searched', {
       distinct_id: user.uid,
       organisationID: user.organisationID,
