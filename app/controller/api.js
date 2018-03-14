@@ -197,8 +197,10 @@ exports.acceptRequest = async function(req) {
       // @TODO: Add this back in somehow! (It currently uses Firebase Functions, which check user is in the organisation in the Firebase Sifrestore database - this means it won't currently work, because the user data is mainly in Algolia!)
       // await users.checkPermissions(req.organisationID, req.sender)
     }
+    const card = {}
     if (!req.intent) { // @TODO: Check making this conditional doesn't break anything!
       const nlpData = await nlp.process(req.sender, req.text, req.contexts)
+      if (nlpData['intent'] === 'store') card = req
       req = combineObjects(req, nlpData)
     }
     var result
@@ -210,7 +212,7 @@ exports.acceptRequest = async function(req) {
         result = await deleteCard(req)
         break
       default:
-        result = await routeByIntent(req)
+        result = await routeByIntent(req, card)
     }
     console.log('result')
     console.log(result)
@@ -304,7 +306,7 @@ exports.fetchMixpanelData = function(data) {
 }
 
 
-const routeByIntent = function(requestData) {
+const routeByIntent = function(requestData, card) {
 	logger.trace(routeByIntent, requestData)
 	const d = Q.defer()
   var memory = {}
@@ -333,7 +335,7 @@ const routeByIntent = function(requestData) {
 
 		case "store":
       // logger.info(memory)
-			saveMemory(memory, requestData)
+			saveMemory(memory, requestData, card)
 			.then(function(card) {
 				d.resolve({ card: card })
 			}).catch(function(e) {
@@ -561,7 +563,7 @@ const recallMemory = function(requestData) {
 	return d.promise
 }
 
-const saveMemory = function(m, requestData) {
+const saveMemory = function(m, requestData, card) {
 	logger.trace()
 	const d = Q.defer()
 	m.hasAttachments = !!(m.attachments) /* @TODO: investigate whether brackets are needed */
@@ -606,7 +608,8 @@ const saveMemory = function(m, requestData) {
     //   // logger.info(m)
 		// 	return updateDb(requestData.sender, m, requestData)
 		// } else {
-    const card = JSON.parse(JSON.stringify(requestData))
+    const card = JSON.parse(JSON.stringify(card))
+    if (!card.description && requestData.text) card.description = requestData.text
     if (card.description) {
       card.description = card.description.replace(/^remember that /i, '').replace(/^remember /i, '')
       card.description = card.description.charAt(0).toUpperCase() + card.description.slice(1)
