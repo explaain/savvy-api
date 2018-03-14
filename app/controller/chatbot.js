@@ -715,7 +715,7 @@ function intentConfidence(sender, message, extraData) {
 const getResponseMessage = function(data) {
 	logger.debug(getResponseMessage, data)
 	const sender = data.requestData.sender
-	var m = data.memories ? data.memories[0] : null
+	var m = (data.memories ? data.memories[0] : data.card) || null
 	var intent = data.requestData.intent
 	if (intent == 'provideDateTime') intent = 'setTask.dateTime'
 	if (intent == 'provideURL') intent = 'setTask.URL'
