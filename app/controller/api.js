@@ -197,7 +197,7 @@ exports.acceptRequest = async function(req) {
       // @TODO: Add this back in somehow! (It currently uses Firebase Functions, which check user is in the organisation in the Firebase Sifrestore database - this means it won't currently work, because the user data is mainly in Algolia!)
       // await users.checkPermissions(req.organisationID, req.sender)
     }
-    const card = {}
+    var card = {}
     if (!req.intent) { // @TODO: Check making this conditional doesn't break anything!
       const nlpData = await nlp.process(req.sender, req.text, req.contexts)
       if (nlpData['intent'] === 'store') card = req
