@@ -20,7 +20,6 @@ const emoji = require('moji-translate')
 const schedule = require('node-schedule')
 const chrono = require('chrono-node')
 const Sherlock = require('sherlockjs')
-const crypto = require("crypto")
 const axios = require("axios")
 
 const properties = require('../config/properties')
@@ -642,7 +641,7 @@ const saveMemory = function(m, requestData, tempCard) {
     }
     console.log('card!!!!!!')
     console.log(card)
-    return axios.post('https://savvy-nlp--staging.herokuapp.com/save-card', { card: card, author: author })
+    return axios.post(process.env.NLP_SERVER + '/save-card', { card: card, author: author })
     // return axios.post('http://localhost:5050/save-card', { card: card, author: author })
 	}).then(function(res) {
     const card = res.data.card
@@ -766,14 +765,14 @@ exports.fetchUserDataFromDb = users.fetchUserDataFromDb;
 
 
 const verifyCard = async req => {
-  const res = await axios.post('https://savvy-nlp--staging.herokuapp.com/verify-card', { objectID: req.objectID, author: req.sender, prop: req.prop, approve: req.approve })
+  const res = await axios.post(process.env.NLP_SERVER + '/verify-card', { objectID: req.objectID, author: req.sender, prop: req.prop, approve: req.approve })
   // const res = await axios.post('http://localhost:5050/verify-card', { objectID: req.objectID, author: req.sender, prop: req.prop, approve: req.approve })
   const result = res.data
   return result
 }
 
 const deleteCard = async req => {
-  const res = await axios.post('https://savvy-nlp--staging.herokuapp.com/delete-card', { card: { objectID: req.objectID }, author: req.sender })
+  const res = await axios.post(process.env.NLP_SERVER + '/delete-card', { card: { objectID: req.objectID }, author: req.sender })
   // const res = await axios.post('http://localhost:5050/delete-card', { card: { objectID: req.objectID }, author: req.sender })
   const result = res.data
   return result

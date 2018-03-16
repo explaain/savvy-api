@@ -2,6 +2,7 @@ const tracer = require('tracer')
 const logger = tracer.colorConsole({level: 'debug'})
 const sinon = require('sinon')
 const axios = require("axios");
+const crypto = require("crypto")
 const track = require('../controller/track')
 const Algolia = require('../controller/db_algolia')
 
@@ -53,19 +54,32 @@ exports.getUserFromSender = async function(sender, platform) {
     default: 'uid'
   }[platform || 'default']]
   console.log('platformSpecificID:', platformSpecificID);
+  var user
+  if (!platform) platform = 'firebase'
   try {
-    const user = platform ? await AlgoliaUsers.getFirstFromSearch({
+    user = await AlgoliaUsers.getFirstFromSearch({
       filters: platform + ': ' + platformSpecificID
-    }) : await AlgoliaUsers.getObject(platformSpecificID)
-    user.uid = user.objectID
-    user.idToken = sender.idToken
-    if (sender.role) user.role = sender.role
-    user.platformSpecific = sender
-    // delete user.objectID
-    delete user._highlightResult
-    return user
+    })
   } catch (e) {
-    logger.info('Failed to fetch User')
+    console.log(e)
+  }
+  if (!user) {
+    try {
+      user = await AlgoliaUsers.getObject(platformSpecificID)
+    } catch (err) {
+      console.log(e)
+    }
+  }
+  if (user && user.objectID) {
+    user.idToken = sender.idToken
+    user.platformSpecific = sender
+    user.uid = user.objectID
+    if (sender.role) user.role = sender.role
+    if (user._highlightResult) delete user._highlightResult
+    return user
+  } else {
+    console.log('Couldn\'t find a user from these sender details:', sender)
+    console.log(err)
     return false
   }
 }
@@ -74,14 +88,14 @@ exports.authenticateSender = user => new Promise((resolve, reject) => {
   logger.debug('authenticateSender', user)
   // var error
   if (!user) throw new Error('No user data provided')
-  if (!user.uid) throw new Error('No user uid provided')
+  if (!user.firebase && !user.uid) throw new Error('No user \'firebase\' or uid provided')
   if (!user.idToken) throw new Error('No user idToken provided')
   // if (error) console.error(error); reject(error)
 
   FirebaseAdmin.auth().verifyIdToken(user.idToken)
   .then(function(decodedToken) {
     var uid = decodedToken.uid;
-    if (user.uid == uid) {
+    if (user.firebase == uid || user.uid == uid) {
       logger.info('🔑👤  User Authentication Succcessful!')
       resolve()
     } else {

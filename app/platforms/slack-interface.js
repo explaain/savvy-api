@@ -32,12 +32,12 @@ const getOrg = async teamID => {
 }
 const getOrgFromName = async organisationID => {
   logger.trace(getOrg, organisationID)
-  const existingOrg = Orgs.filter(org => org.name === organisationID)
+  const existingOrg = Orgs.filter(org => org.organisationID === organisationID)
   if (existingOrg.length)
     return existingOrg[0]
   else {
     const newOrg = await Encrypt.getData(SlackAuthIndex, null, {
-      name: organisationID
+      organisationID: organisationID
     })
     Orgs[newOrg.objectID] = newOrg
     return newOrg
@@ -124,10 +124,10 @@ exports.oauth = function(req, res) {
         .then(teamInfo => {
           org.slack.name = teamInfo.name
           org.slack.domain = teamInfo.domain
-          org.name = teamInfo.domain
+          org.organisationID = teamInfo.domain
           setOrg(teamID, org)
         }).then(result => {
-          axios.post('https://savvy-nlp--staging.herokuapp.com/set-up-org', { organisationID: org.name })
+          axios.post(process.env.NLP_SERVER + '/set-up-org', { organisationID: org.organisationID })
           initateSlackBot(org.slack, { userID: slackKeychain.user_id })
           res.redirect(`https://${org.slack.domain}.slack.com/`)
         }).catch(e => {
@@ -190,7 +190,7 @@ const initateSlackBot = async (slackTeam, onboarding) => {
         const messageData = {
           teamID: message.team,
           recipient: message.channel,
-          text: 'Ready to connect up your Google Drive and become a Savvy power user? 🚀 Just go here: ' + org.name + '.heysavvy.com'
+          text: 'Ready to connect up your Google Drive and become a Savvy power user? 🚀 Just go here: ' + org.organisationID + '.heysavvy.com'
         }
         logger.trace(messageData)
         sendMessage(messageData)
