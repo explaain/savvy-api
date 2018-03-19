@@ -14,6 +14,7 @@ FirebaseAdmin.initializeApp({
 }, 'savvy') // Giving it a name so we're allowed to have this alongside the existing app (forgetmenot) - need to consolidate!
 
 if (process.env.NODE_ENV === "test") {
+  console.log('Environment is test!!!')
   const sandbox = sinon.sandbox.create()
   const testUser = {
     'slack': 'U04NVHJFD',

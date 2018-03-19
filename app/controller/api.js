@@ -191,7 +191,7 @@ exports.acceptRequest = async function(req) {
       user = await users.createUserFromSlack(req.sender)
     }
     if (user) req.sender = user
-    if (req.platform !== 'slack') {
+    if (req.platform !== 'slack' && req.sender.organisationID !== 'yc') {
       await users.authenticateSender(req.sender)
       // @TODO: Add this back in somehow! (It currently uses Firebase Functions, which check user is in the organisation in the Firebase Sifrestore database - this means it won't currently work, because the user data is mainly in Algolia!)
       // await users.checkPermissions(req.organisationID, req.sender)
@@ -628,7 +628,7 @@ const saveMemory = function(m, requestData, tempCard) {
     if (card.generalIntent) delete card.generalIntent
     if (card.modified) delete card.modified
     if (card.allInOne) delete card.allInOne
-    if (requestData.service && requestData.service) {
+    if (requestData.service && requestData.service && !card.type) {
       card.type = 'file' // @TODO: We're assuming this! Fix!
     }
     // @TODO: Maybe have user choose a source so we can send card.source?
