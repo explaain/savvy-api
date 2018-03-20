@@ -370,7 +370,7 @@ function sendResponseAfterDelay(thisResponse, delay) {
     if (thisResponse.message.cards && thisResponse.message.cards.length) {
       // thisResponse.message.text = 'Here\'s what I found:'
       thisResponse.message.cards.forEach((card, i) => {
-        card.sentence = card.description + (card.listCards && card.listCards.length ? '\n\n- ' + card.listCards.join('\n- ') : '')
+        card.sentence = card.description + (card.listCards && card.listCards.length ? '\n\n- ' + card.listCards.join('\n- ') : (card.cells && card.cells.length ? '\n\n- ' + card.cells.map(cell => cell.content).join('\n- ') : ''))
         const attachment = {
           fields: [],
         }
