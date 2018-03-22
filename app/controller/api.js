@@ -658,7 +658,7 @@ const saveMemory = function(m, requestData, tempCard) {
 
 
 const searchForCards = async function(user, params, metadata) {
-  logger.trace(searchForCards, user, params)
+  logger.trace(searchForCards, user, params, metadata)
   try {
     const index = user.organisationID + '__Cards'
     logger.debug('📡  Sending to Algolia:', params)
