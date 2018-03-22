@@ -202,8 +202,8 @@ exports.acceptRequest = async function(req) {
     if (!req.intent || req.intent === 'query') { // @TODO: Check making this conditional doesn't break anything!
       const nlpData = await nlp.process(req.sender, req.text || req.query, req.contexts)
       if (nlpData.intent === 'store') card = req
-      req.parameters = combineObjects(req.parameters, nlpData.parameters)
-      req = combineObjects(req, nlpData)
+      req.parameters = combineObjects(req.parameters || {}, nlpData.parameters || {})
+      req = combineObjects(req || {}, nlpData || {})
     }
     var result
     switch (req.intent) {
