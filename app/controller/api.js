@@ -526,6 +526,7 @@ const recallMemory = function(requestData) {
 			query: searchTerm,
 			// filters: userIdFilterString,
       hitsPerPage: 10,
+      searchStrategy: requestData.parameters && requestData.parameters.searchStrategy || 'algolia',
 			// filters: (attachments ? 'hasAttachments: true' : '')
 		};
     if (!requestData.filters) requestData.filters = {}
@@ -662,7 +663,22 @@ const searchForCards = async function(user, params, metadata) {
   try {
     const index = user.organisationID + '__Cards'
     logger.debug('📡  Sending to Algolia:', params)
-    const content = await Algolia.connect(AlgoliaParams.appID, user.algoliaApiKey, index).searchObjects(params)
+    var content
+    try {
+      content = params.searchStrategy && params.searchStrategy === 'elasticsearch'
+      ? await axios.post(process.env.NLP_SERVER + '/search-cards', { user: user, query: params.query || '', params: params })
+      : await Algolia.connect(AlgoliaParams.appID, user.algoliaApiKey, index).searchObjects(params)
+      if (params.searchStrategy && params.searchStrategy === 'elasticsearch') {
+        content = content.data
+      }
+    } catch (e) {
+      console.log(e)
+      content = {
+        hits: []
+      }
+    }
+    console.log('content')
+    console.log(content)
     // const itemCards = await fetchListItemCards(apiKey, index, content.hits) // What do we do with itemCards here?!
     logger.debug('🔦  Received from Algolia:', content.hits.map(hit => { return { title: hit.title || null, content: (hit.content || hit.description || hit.title || hit.fileTitle || '').substring(0, 50)+'...', fileTitle: hit.fileTitle || null } }))
     logger.debug('Search Results:', content)
