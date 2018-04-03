@@ -630,9 +630,9 @@ const saveMemory = function(m, requestData, tempCard) {
     if (card.generalIntent) delete card.generalIntent
     if (card.modified) delete card.modified
     if (card.allInOne) delete card.allInOne
-    if (requestData.service && requestData.service && !card.type) {
-      card.type = 'file' // @TODO: We're assuming this! Fix!
-    }
+    // if (requestData.service && requestData.service && !card.type) {
+    //   card.type = 'file' // @TODO: We're assuming this! Fix!
+    // }
     // @TODO: Maybe have user choose a source so we can send card.source?
     const author = {
       objectID: requestData.sender.objectID,
