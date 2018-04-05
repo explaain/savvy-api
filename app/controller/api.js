@@ -718,7 +718,7 @@ const searchForCards = async function(user, params, metadata) {
       const description = userFullName + ' Searched for "' + trackData.searchQuery + '"'
       console.log('description')
       console.log(description)
-      const details = '_' + trackData.noOfResults + ' Results._' + (trackData.noOfResults ? (' First Result:\n\n' + getAllCardContent(trackData.results[0])) : '')
+      const details = '_' + (['Jeremy Evans', 'Matt Morley'].indexOf(userFullName) === -1 ? '(Alerting @channel) ' : '') + trackData.noOfResults + ' Results._' + (trackData.noOfResults ? (' First Result:\n\n' + getAllCardContent(trackData.results[0])) : '')
       console.log('details')
       console.log(details)
       track.slack(description, details, trackData)
