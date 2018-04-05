@@ -682,7 +682,7 @@ const searchForCards = async function(user, params, metadata) {
     // const itemCards = await fetchListItemCards(apiKey, index, content.hits) // What do we do with itemCards here?!
     logger.debug('🔦  Received from Algolia:', content.hits.map(hit => { return { title: hit.title || null, content: (hit.content || hit.description || hit.title || hit.fileTitle || '').substring(0, 50)+'...', fileTitle: hit.fileTitle || null } }))
     logger.debug('Search Results:', content)
-    track.event('Searched', {
+    const trackData = {
       distinct_id: user.uid,
       organisationID: user.organisationID,
       userID: user.uid,
@@ -701,7 +701,31 @@ const searchForCards = async function(user, params, metadata) {
       cardModified: content.hits.length === 1 ? content.hits[0].modified : null,
       cardCreated: content.hits.length === 1 ? content.hits[0].created : null,
       dialogFlowSuccess: metadata.dialogFlowSuccess,
-    })
+    }
+    track.event('Searched', trackData)
+    try {
+      userFullNames = {
+        'vZweCaZEWlZPx0gpQn2b1B7DFAZ2': 'Jeremy Evans',
+        '0wdk1iDhMoN5AXWakLiKrz4PjQ22': 'Matt Morley',
+        'paul_graham': 'Paul Graham',
+        'DfMygzCZpYWdV945DMrzpjq4Y4i1': 'Andrew Davies',
+        'GTWoMyKft8S3Z8zT4WGMAaekjs13': 'Matthew Rusk',
+        'ONNKKLsmFshcJxh9BH4Q2R1bndB2': 'Robin Kwong',
+      }
+      userFullName = user.fullName || user.displayName || userFullNames[user.uid] || '{' + user.uid + '}'
+      console.log('userFullName')
+      console.log(userFullName)
+      const description = userFullName + ' Searched for "' + trackData.searchQuery + '"'
+      console.log('description')
+      console.log(description)
+      const details = '_' + trackData.noOfResults + ' Results._' + (trackData.noOfResults ? (' First Result:\n\n' + getAllCardContent(trackData.results[0])) : '')
+      console.log('details')
+      console.log(details)
+      track.slack(description, details, trackData)
+    } catch (e) {
+      track.slack('Failed to track something!')
+      console.log(e)
+    }
     return content
   } catch (e) {
     logger.error(e)
@@ -1107,4 +1131,14 @@ const getGeneralIntent = function(intent) {
 
 if (process.env.NODE_ENV !== "test") {
   // rescheduleAllReminders()
+}
+
+
+const getAllCardContent = card => {
+  const bits = ['title', 'description'].map(key => card[key]).filter(val => val)
+  const lists = ['listCards', 'cells'].map(key => card[key]).filter(val => val).map(val => val.map(val => val.content || val.description).filter(val => val).join('\n'))
+  console.log('bits', bits)
+  const content = bits.join('\n') + (lists ? ('\n' + lists.join('\n')) : '')
+  console.log('content', content)
+  return content
 }
