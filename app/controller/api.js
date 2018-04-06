@@ -708,9 +708,9 @@ const searchForCards = async function(user, params, metadata) {
         'vZweCaZEWlZPx0gpQn2b1B7DFAZ2': 'Jeremy Evans',
         '0wdk1iDhMoN5AXWakLiKrz4PjQ22': 'Matt Morley',
         'paul_graham': 'Paul Graham',
-        'DfMygzCZpYWdV945DMrzpjq4Y4i1': 'Andrew Davies',
-        'GTWoMyKft8S3Z8zT4WGMAaekjs13': 'Matthew Rusk',
-        'ONNKKLsmFshcJxh9BH4Q2R1bndB2': 'Robin Kwong',
+        '696106160': 'Andrew Davies',
+        '656998572': 'Matthew Rusk',
+        '537896010': 'Robin Kwong',
       }
       userFullName = user.fullName || user.displayName || userFullNames[user.uid] || '{' + user.uid + '}'
       console.log('userFullName')
