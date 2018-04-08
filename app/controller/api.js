@@ -527,6 +527,7 @@ const recallMemory = function(requestData) {
 			// filters: userIdFilterString,
       hitsPerPage: 10,
       searchStrategy: requestData.parameters && requestData.parameters.searchStrategy || 'algolia',
+      environment: requestData.parameters && requestData.parameters.environment || null,
 			// filters: (attachments ? 'hasAttachments: true' : '')
 		};
     if (!requestData.filters) requestData.filters = {}
@@ -686,7 +687,7 @@ const searchForCards = async function(user, params, metadata) {
       distinct_id: user.uid,
       organisationID: user.organisationID,
       userID: user.uid,
-      searchQuery: params.query,
+      searchQuery: params && params.query,
       results: content.hits,
       noOfResults: content.hits.length,
       searchParams: params,
@@ -701,30 +702,29 @@ const searchForCards = async function(user, params, metadata) {
       cardModified: content.hits.length === 1 ? content.hits[0].modified : null,
       cardCreated: content.hits.length === 1 ? content.hits[0].created : null,
       dialogFlowSuccess: metadata.dialogFlowSuccess,
+      searchStrategy: params && params.searchStrategy || null,
     }
     track.event('Searched', trackData)
-    try {
-      userFullNames = {
-        'vZweCaZEWlZPx0gpQn2b1B7DFAZ2': 'Jeremy Evans',
-        '0wdk1iDhMoN5AXWakLiKrz4PjQ22': 'Matt Morley',
-        'paul_graham': 'Paul Graham',
-        '696106160': 'Andrew Davies',
-        '656998572': 'Matthew Rusk',
-        '537896010': 'Robin Kwong',
+    if (!params.environment || params.environment !== 'local') {
+      try {
+        userFullNames = {
+          'vZweCaZEWlZPx0gpQn2b1B7DFAZ2': 'Jeremy Evans',
+          '0wdk1iDhMoN5AXWakLiKrz4PjQ22': 'Matt Morley',
+          'paul_graham': 'Paul Graham',
+          '696106160': 'Andrew Davies',
+          '656998572': 'Matthew Rusk',
+          '537896010': 'Robin Kwong',
+        }
+        userFullName = user.fullName || user.displayName || userFullNames[user.uid] || '{' + user.uid + '}'
+        const description = '*' + userFullName + '* searched for "*' + trackData.searchQuery + '*"'
+        const details = '_' + (['Jeremy Evans', 'Matt Morley'].indexOf(userFullName) === -1 ? '(Alerting @channel) ' : '') + trackData.noOfResults + ' Results_\n' + (params.searchStrategy === 'elasticsearch' ? '_ElasticSearch_' : '_Algolia_') + (trackData.noOfResults ? ('\n\n>>>' + getAllCardContent(trackData.results[0])) : '')
+        track.slack(description, details, trackData)
+      } catch (e) {
+        track.slack('@channel Failed to track something!')
+        console.log(e)
       }
-      userFullName = user.fullName || user.displayName || userFullNames[user.uid] || '{' + user.uid + '}'
-      console.log('userFullName')
-      console.log(userFullName)
-      const description = userFullName + ' Searched for "' + trackData.searchQuery + '"'
-      console.log('description')
-      console.log(description)
-      const details = '_' + (['Jeremy Evans', 'Matt Morley'].indexOf(userFullName) === -1 ? '(Alerting @channel) ' : '') + trackData.noOfResults + ' Results._' + (trackData.noOfResults ? (' First Result:\n\n' + getAllCardContent(trackData.results[0])) : '')
-      console.log('details')
-      console.log(details)
-      track.slack(description, details, trackData)
-    } catch (e) {
-      track.slack('Failed to track something!')
-      console.log(e)
+    } else {
+      console.log('LOCAL ENVIRONMENT!')
     }
     return content
   } catch (e) {
@@ -1136,9 +1136,7 @@ if (process.env.NODE_ENV !== "test") {
 
 const getAllCardContent = card => {
   const bits = ['title', 'description'].map(key => card[key]).filter(val => val)
-  const lists = ['listCards', 'cells'].map(key => card[key]).filter(val => val).map(val => val.map(val => val.content || val.description).filter(val => val).join('\n'))
-  console.log('bits', bits)
+  const lists = ['listCards', 'cells'].map(key => card[key]).filter(val => val).map(val => val.map(val => val.content || val.description || val).filter(val => val).join('\n'))
   const content = bits.join('\n') + (lists ? ('\n' + lists.join('\n')) : '')
-  console.log('content', content)
   return content
 }
