@@ -527,7 +527,6 @@ const recallMemory = function(requestData) {
 			// filters: userIdFilterString,
       hitsPerPage: 10,
       searchStrategy: requestData.parameters && requestData.parameters.searchStrategy || 'algolia',
-      environment: requestData.parameters && requestData.parameters.environment || null,
 			// filters: (attachments ? 'hasAttachments: true' : '')
 		};
     if (!requestData.filters) requestData.filters = {}
@@ -537,7 +536,8 @@ const recallMemory = function(requestData) {
       searchParams.filters = 'type: "' + requestData.filters.type + '"'
     logger.trace(searchParams)
     metadata = {
-      dialogFlowSuccess: requestData.dialogFlowSuccess
+      dialogFlowSuccess: requestData.dialogFlowSuccess,
+      environment: requestData.parameters && requestData.parameters.environment || null,
     }
     return searchForCards(requestData.sender, searchParams, metadata)
 	}).then(function(content) {
@@ -672,6 +672,12 @@ const searchForCards = async function(user, params, metadata) {
       if (params.searchStrategy && params.searchStrategy === 'elasticsearch') {
         content = content.data
       }
+      // Legacy
+      content.hits = content.hits.map(card => {
+        if (card.service === 'gdrive' && card.subService)
+          card.service = card.subService
+        return card
+      })
     } catch (e) {
       console.log(e)
       content = {
@@ -705,7 +711,7 @@ const searchForCards = async function(user, params, metadata) {
       searchStrategy: params && params.searchStrategy || null,
     }
     track.event('Searched', trackData)
-    if (!params.environment || params.environment !== 'local') {
+    if (!metadata.environment || metadata.environment !== 'local') {
       try {
         userFullNames = {
           'vZweCaZEWlZPx0gpQn2b1B7DFAZ2': 'Jeremy Evans',
