@@ -724,6 +724,7 @@ const searchForCards = async function(user, params, metadata) {
             '696106160': 'Andrew Davies',
             '656998572': 'Matthew Rusk',
             '537896010': 'Robin Kwong',
+            '656998937': 'Guzel',
           }
           userFullName = user.fullName || user.displayName || userFullNames[user.uid] || '{' + user.uid + '}'
           const description = '*' + userFullName + '* searched for "*' + trackData.searchQuery + '*"'
