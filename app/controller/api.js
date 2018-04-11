@@ -712,22 +712,27 @@ const searchForCards = async function(user, params, metadata) {
     }
     track.event('Searched', trackData)
     if (!metadata.environment || metadata.environment !== 'local') {
-      try {
-        userFullNames = {
-          'vZweCaZEWlZPx0gpQn2b1B7DFAZ2': 'Jeremy Evans',
-          '0wdk1iDhMoN5AXWakLiKrz4PjQ22': 'Matt Morley',
-          'paul_graham': 'Paul Graham',
-          '696106160': 'Andrew Davies',
-          '656998572': 'Matthew Rusk',
-          '537896010': 'Robin Kwong',
+      usersToIgnore = {
+        '717659412': 'Test Savvy 03',
+      }
+      if (!usersToIgnore[user.uid]) {
+        try {
+          userFullNames = {
+            'vZweCaZEWlZPx0gpQn2b1B7DFAZ2': 'Jeremy Evans',
+            '0wdk1iDhMoN5AXWakLiKrz4PjQ22': 'Matt Morley',
+            'paul_graham': 'Paul Graham',
+            '696106160': 'Andrew Davies',
+            '656998572': 'Matthew Rusk',
+            '537896010': 'Robin Kwong',
+          }
+          userFullName = user.fullName || user.displayName || userFullNames[user.uid] || '{' + user.uid + '}'
+          const description = '*' + userFullName + '* searched for "*' + trackData.searchQuery + '*"'
+          const details = '_' + (['Jeremy Evans', 'Matt Morley'].indexOf(userFullName) === -1 ? '(Alerting @channel) ' : '') + trackData.noOfResults + ' Results_\n' + (params.searchStrategy === 'elasticsearch' ? '_ElasticSearch_' : '_Algolia_') + (trackData.noOfResults ? ('\n\n>>>' + getAllCardContent(trackData.results[0])) : '')
+          track.slack(description, details, trackData)
+        } catch (e) {
+          track.slack('@channel Failed to track something!')
+          console.log(e)
         }
-        userFullName = user.fullName || user.displayName || userFullNames[user.uid] || '{' + user.uid + '}'
-        const description = '*' + userFullName + '* searched for "*' + trackData.searchQuery + '*"'
-        const details = '_' + (['Jeremy Evans', 'Matt Morley'].indexOf(userFullName) === -1 ? '(Alerting @channel) ' : '') + trackData.noOfResults + ' Results_\n' + (params.searchStrategy === 'elasticsearch' ? '_ElasticSearch_' : '_Algolia_') + (trackData.noOfResults ? ('\n\n>>>' + getAllCardContent(trackData.results[0])) : '')
-        track.slack(description, details, trackData)
-      } catch (e) {
-        track.slack('@channel Failed to track something!')
-        console.log(e)
       }
     } else {
       console.log('LOCAL ENVIRONMENT!')
