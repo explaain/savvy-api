@@ -2,6 +2,7 @@
 require('dotenv').config();
 
 var express = require('express');
+var Raven = require('raven');
 var cors = require('cors')
 var path = require('path');
 var favicon = require('serve-favicon');
@@ -21,6 +22,14 @@ var notifications = require('./app/routes/notifications')
 var analytics = require('./app/routes/analytics')
 
 var app = express();
+
+/* SENTRY (Also known as Raven) */
+// Must configure Raven before doing anything else with it
+Raven.config('https://0f6bfaeaa2de41859f9e3d5f8ddd180d:32d633afddb3423eade766c1a4fc40a3@sentry.io/1190706').install();
+// The request handler must be the first middleware on the app
+app.use(Raven.requestHandler());
+// The error handler must be before any other error middleware
+app.use(Raven.errorHandler());
 
 app.use(cors())
 
