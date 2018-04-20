@@ -159,6 +159,7 @@ const sendClientMessage = function(data) {
 // @TODO: Remove this and use exports.acceptRequest()
 exports.deleteMemories = (sender, apiKey, organisationID, objectID) => new Promise(function(resolve, reject) {
   logger.trace('deleteMemories', sender, apiKey, organisationID, objectID)
+  // @TODO: Algolia/ElasticSearch
   Algolia.connect(sender, apiKey, organisationID + '__Cards').deleteObject(objectID)
   .then(function(result) {
     track.event('Card Deleted', {
@@ -666,15 +667,11 @@ const searchForCards = async function(user, params, metadata) {
   logger.trace(searchForCards, user, params, metadata)
   try {
     const index = user.organisationID + '__Cards'
-    logger.debug('📡  Sending to Algolia:', params)
+    logger.debug('📡  Sending to Algolia/ElasticSearch:', params)
     var content
     try {
-      content = params.searchStrategy && params.searchStrategy === 'elasticsearch'
-      ? await axios.post(process.env.NLP_SERVER + '/search-cards', { user: user, query: params.query || '', params: params })
-      : await Algolia.connect(AlgoliaParams.appID, user.algoliaApiKey, index).searchObjects(params)
-      if (params.searchStrategy && params.searchStrategy === 'elasticsearch') {
-        content = content.data
-      }
+      const res = await axios.post(process.env.NLP_SERVER + '/search-cards', { user: user, query: params.query || '', params: params })
+      content = res.data
       // Legacy
       content.hits = content.hits.map(card => {
         if (card.service === 'gdrive' && card.subService)
@@ -690,7 +687,7 @@ const searchForCards = async function(user, params, metadata) {
     console.log('content')
     console.log(content)
     // const itemCards = await fetchListItemCards(apiKey, index, content.hits) // What do we do with itemCards here?!
-    logger.debug('🔦  Received from Algolia:', content.hits.map(hit => { return { title: hit.title || null, content: (hit.content || hit.description || hit.title || hit.fileTitle || '').substring(0, 50)+'...', fileTitle: hit.fileTitle || null } }))
+    logger.debug('🔦  Received from Algolia/ElasticSearch:', content.hits.map(hit => { return { title: hit.title || null, content: (hit.content || hit.description || hit.title || hit.fileTitle || '').substring(0, 50)+'...', fileTitle: hit.fileTitle || null } }))
     logger.debug('Search Results:', content)
     const trackData = {
       distinct_id: user.uid,
@@ -765,7 +762,9 @@ const saveToDb = async function(user, card, requestData) {
   }
   if (card.title) data.title = card.title
   logger.trace('💎  Here\'s the data:', data)
-  response = await Algolia.connect(AlgoliaParams.appID, user.algoliaApiKey, user.organisationID + '__Cards').saveObject(user, data)
+  // @TODO: Algolia/ElasticSearch
+  const response = await axios.post(process.env.NLP_SERVER + '/save-card', { card: data, author: user })
+  // response = await Algolia.connect(AlgoliaParams.appID, user.algoliaApiKey, user.organisationID + '__Cards').saveObject(user, data)
   logger.trace('📪  The response!', response)
   if (!data.objectID) data.objectID = response.objectID
   track.event('Card Saved', {
@@ -910,40 +909,40 @@ const scheduleReminder = function(memory) {
 	});
 }
 
-
-
-const fetchListItemCards = function(apiKey, index, cards) {
-  const d = Q.defer()
-  const self = this
-  const promises = []
-  cards.forEach(function(card) {
-    if (card.listItems) {
-      card.listCards = {}
-      card.listItems.forEach(function(key) {
-        const p = Q.defer()
-        Algolia.connect(AlgoliaParams.appID, apiKey, index).getObject(key)
-        .then(function(content) {
-          card.listCards[key] = content;
-          p.resolve(content);
-        }).catch(function(e) {
-          logger.error(e);
-          p.reject(e)
-        })
-        promises.push(p.promise)
-      })
-    }
-  })
-  Q.allSettled(promises)
-  .then(function(results) {
-    logger.trace('List Item Cards:', results)
-    d.resolve(results);
-  }).catch(function(e) {
-    logger.error(e);
-    d.reject(e)
-  })
-  return d.promise
-}
-
+//
+//
+// const fetchListItemCards = function(apiKey, index, cards) {
+//   const d = Q.defer()
+//   const self = this
+//   const promises = []
+//   cards.forEach(function(card) {
+//     if (card.listItems) {
+//       card.listCards = {}
+//       card.listItems.forEach(function(key) {
+//         const p = Q.defer()
+//         Algolia.connect(AlgoliaParams.appID, apiKey, index).getObject(key)
+//         .then(function(content) {
+//           card.listCards[key] = content;
+//           p.resolve(content);
+//         }).catch(function(e) {
+//           logger.error(e);
+//           p.reject(e)
+//         })
+//         promises.push(p.promise)
+//       })
+//     }
+//   })
+//   Q.allSettled(promises)
+//   .then(function(results) {
+//     logger.trace('List Item Cards:', results)
+//     d.resolve(results);
+//   }).catch(function(e) {
+//     logger.error(e);
+//     d.reject(e)
+//   })
+//   return d.promise
+// }
+//
 
 const getActionSentence2 = function(sentence, context, reminder) {
   logger.info(sentence)
