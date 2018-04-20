@@ -47,6 +47,19 @@ router.post('/verify', function(req, res) {
 	});
 });
 
+router.post('/get-card', function(req, res) {
+  const data = req.body;
+  data.intent = 'getCard'
+  apiController.acceptRequest(data)
+  .then(function(results) {
+		res.status(200).send(results);
+	}).catch(function(e) {
+    console.log(req.body);
+    console.error(e)
+		res.status(e.code).send(data)
+	});
+});
+
 router.post('/import', function(req, res) {
   const data = req.body;
   importController.acceptRequest(data)

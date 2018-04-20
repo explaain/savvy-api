@@ -210,6 +210,9 @@ exports.acceptRequest = async function(req) {
       case 'verify':
         result = await verifyCard(req)
         break
+      case 'getCard':
+        result = await getCard(req)
+        break
       case 'delete':
         result = await deleteCard(req)
         break
@@ -819,6 +822,13 @@ exports.fetchUserDataFromDb = users.fetchUserDataFromDb;
 
 const verifyCard = async req => {
   const res = await axios.post(process.env.NLP_SERVER + '/verify-card', { objectID: req.objectID, author: req.sender, prop: req.prop, approve: req.approve })
+  // const res = await axios.post('http://localhost:5050/verify-card', { objectID: req.objectID, author: req.sender, prop: req.prop, approve: req.approve })
+  const result = res.data
+  return result
+}
+
+const getCard = async req => {
+  const res = await axios.post(process.env.NLP_SERVER + '/get-card', { objectID: req.objectID, user: req.sender, params: req.params })
   // const res = await axios.post('http://localhost:5050/verify-card', { objectID: req.objectID, author: req.sender, prop: req.prop, approve: req.approve })
   const result = res.data
   return result
