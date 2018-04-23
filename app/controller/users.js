@@ -58,19 +58,21 @@ exports.getUserFromSender = async function(sender, platform) {
   var user
   if (!platform) platform = 'firebase'
   try {
-    user = await AlgoliaUsers.getFirstFromSearch({
-      filters: platform + ': ' + platformSpecificID
-    })
+    user = await axios.post(process.env.NLP_SERVER + '/get-user', { idToken: sender.idToken })
+    // user = await AlgoliaUsers.getFirstFromSearch({
+    //   filters: platform + ': ' + platformSpecificID
+    // })
   } catch (e) {
     console.log(e)
   }
-  if (!user) {
-    try {
-      user = await AlgoliaUsers.getObject(platformSpecificID)
-    } catch (err) {
-      console.log(e)
-    }
-  }
+  // if (!user) {
+  //   try {
+  //     user = await AlgoliaUsers.getObject(platformSpecificID)
+  //   } catch (err) {
+  //     console.log(e)
+  //   }
+  // }
+  console.log('user:', user)
   if (user && user.objectID) {
     user.idToken = sender.idToken
     user.platformSpecific = sender
@@ -80,7 +82,6 @@ exports.getUserFromSender = async function(sender, platform) {
     return user
   } else {
     console.log('Couldn\'t find a user from these sender details:', sender)
-    console.log(err)
     return false
   }
 }
@@ -241,12 +242,14 @@ fetchUserDataFromDb = function(user) {
 	logger.trace('fetchUserDataFromDb', user)
   if (typeof user === 'string') {
     console.log('string!');
-    return AlgoliaUsers.getObject(user)
+    // @TODO: Deal with this case - sentry??
+    // return AlgoliaUsers.getObject(user)
   } else {
     console.log('object!');
-    const filters = Object.keys(user).map(key => key + ':\'' + user[key] + '\'').join(' AND ')
-    console.log(filters);
-    return AlgoliaUsers.getFirstFromSearch({ filters: filters})
+    return axios.post(process.env.NLP_SERVER + '/get-user', { idToken: user.idToken })
+    // const filters = Object.keys(user).map(key => key + ':\'' + user[key] + '\'').join(' AND ')
+    // console.log(filters);
+    // return AlgoliaUsers.getFirstFromSearch({ filters: filters})
     // return AlgoliaUsers.getFirstFromFilters({ filters: filters})
   }
 }
@@ -278,16 +281,18 @@ const createUserAccount = function(userData) {
 	return AlgoliaUsers.addObject(userData)
 }
 
-exports.fetchUserData = (userID, forceRefresh) => new Promise((resolve, reject) => {
-  logger.trace('fetchUserData', userID, forceRefresh)
+exports.fetchUserData = (user, forceRefresh) => new Promise((resolve, reject) => {
+  logger.trace('fetchUserData', user, forceRefresh)
+  userID = user.uid || user.objectID
   if (!forceRefresh && (userData = getLocalUser(userID).userData)) {
     resolve(userData)
   } else {
-    fetchUserDataFromDb(userID)
+    fetchUserDataFromDb(user)
     .then(function(userData) {
       resolve(userData)
     }).catch(function(e) {
       if (e.statusCode == 404 || e.statusCode == '404') {
+        // @TODO: remove this since savvy-nlp should handle creation of new accounts
         createUserAccount({objectID: userID})
         .then(function(userData) {
           resolve(userData)

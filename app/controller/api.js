@@ -521,7 +521,7 @@ const recallMemory = function(requestData) {
   })
   searchTerm = searchTerm.substring(0, 500).trim() // Only sends Algolia the first 511 characters as it can't hanlogger.tracee more than that
   logger.trace(searchTerm)
-	users.fetchUserData(requestData.sender.uid)
+	users.fetchUserData(requestData.sender)
 	.then(function(userData) {
 		const readAccessList = userData.readAccess || []
     /* Temporarily allowing everything to search ACME userID */ readAccessList[readAccessList.length] = '101118387301286232222'
@@ -583,7 +583,7 @@ const saveMemory = function(m, requestData, tempCard) {
   var author
   const uid = requestData.sender.uid
   const memoryExists = !!m.objectID
-  users.fetchUserData(uid)
+  users.fetchUserData(requestData.sender)
   .then(function(res) {
     author = res
   //   return memoryExists ? getDbObject(AlgoliaIndex, m.objectID) : Q.fcall(function() {return null})
