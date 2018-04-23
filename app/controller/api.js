@@ -640,7 +640,7 @@ const saveMemory = function(m, requestData, tempCard) {
     // }
     // @TODO: Maybe have user choose a source so we can send card.source?
     const author = {
-      objectID: requestData.sender.objectID,
+      objectID: requestData.sender.objectID || requestData.sender.uid,
       name: requestData.sender.first + ' ' + requestData.sender.last,
       organisationID: requestData.sender.organisationID,
       role: requestData.sender.role,
