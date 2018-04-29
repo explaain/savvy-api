@@ -509,7 +509,7 @@ const routeByIntent = function(requestData, card) {
 	return d.promise
 }
 
-const recallMemory = function(requestData) {
+const recallMemory = async function(requestData) {
 	logger.trace(recallMemory, requestData)
 	const d = Q.defer()
 	var searchTerm = requestData.query.toLowerCase().replace(/[^\w\s.]|_/g, " ");// memory.context.map(function(e){return e.value}).join(' ');
@@ -521,30 +521,30 @@ const recallMemory = function(requestData) {
   })
   searchTerm = searchTerm.substring(0, 500).trim() // Only sends Algolia the first 511 characters as it can't hanlogger.tracee more than that
   logger.trace(searchTerm)
-	users.fetchUserData(requestData.sender)
-	.then(function(userData) {
-		const readAccessList = userData.readAccess || []
-    /* Temporarily allowing everything to search ACME userID */ readAccessList[readAccessList.length] = '101118387301286232222'
-		const userIdFilterString = 'userID: ' + requestData.sender.uid + readAccessList.map(function(id) {return ' OR userID: '+id}).join('');
-		const searchParams = {
-			query: searchTerm,
-			// filters: userIdFilterString,
-      hitsPerPage: 10,
-      searchStrategy: requestData.parameters && requestData.parameters.searchStrategy || 'algolia',
-			// filters: (attachments ? 'hasAttachments: true' : '')
-		};
-    if (!requestData.filters) requestData.filters = {}
-    if (!requestData.filters.type) requestData.filters.type = requestData.parameters.preferredCardType
+  // console.log('Before fetchUserData:', requestData.sender)
+	// const userData = await users.fetchUserData(requestData.sender)
+  // console.log('After fetchUserData:', userData)
+	// const readAccessList = userData.readAccess || []
+  // /* Temporarily allowing everything to search ACME userID */ readAccessList[readAccessList.length] = '101118387301286232222'
+	// const userIdFilterString = 'userID: ' + requestData.sender.uid + readAccessList.map(function(id) {return ' OR userID: '+id}).join('');
+	const searchParams = {
+		query: searchTerm,
+		// filters: userIdFilterString,
+    hitsPerPage: 10,
+    searchStrategy: requestData.parameters && requestData.parameters.searchStrategy || 'algolia',
+		// filters: (attachments ? 'hasAttachments: true' : '')
+	};
+  if (!requestData.filters) requestData.filters = {}
+  if (!requestData.filters.type) requestData.filters.type = requestData.parameters.preferredCardType
 
-    if (requestData.filters.type && requestData.filters.type.length && requestData.filters.type !== 'all')
-      searchParams.filters = 'type: "' + requestData.filters.type + '"'
-    logger.trace(searchParams)
-    metadata = {
-      dialogFlowSuccess: requestData.dialogFlowSuccess,
-      environment: requestData.parameters && requestData.parameters.environment || null,
-    }
-    return searchForCards(requestData.sender, searchParams, metadata)
-	}).then(function(content) {
+  if (requestData.filters.type && requestData.filters.type.length && requestData.filters.type !== 'all')
+    searchParams.filters = 'type: "' + requestData.filters.type + '"'
+  logger.trace(searchParams)
+  metadata = {
+    dialogFlowSuccess: requestData.dialogFlowSuccess,
+    environment: requestData.parameters && requestData.parameters.environment || null,
+  }
+  searchForCards(requestData.sender, searchParams, metadata).then(function(content) {
 		if (!content.hits.length) {
       logger.trace('No results found')
     }

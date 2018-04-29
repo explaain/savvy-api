@@ -50,33 +50,23 @@ const AlgoliaOrgs = new Algolia.Index(process.env.ALGOLIA_APP, process.env.ALGOL
  */
 exports.getUserFromSender = async function(sender, platform) {
   logger.debug('getUserFromSender', sender, platform)
-  const platformSpecificID = sender[{
-    slack: 'user',
-    default: 'uid'
-  }[platform || 'default']]
-  console.log('platformSpecificID:', platformSpecificID);
   var user
   if (!platform) platform = 'firebase'
   try {
-    user = await axios.post(process.env.NLP_SERVER + '/get-user', { idToken: sender.idToken })
-    // user = await AlgoliaUsers.getFirstFromSearch({
-    //   filters: platform + ': ' + platformSpecificID
-    // })
+    const res = await axios.post(process.env.NLP_SERVER + '/get-user', { idToken: sender.idToken })
+    user = {
+      data: res.data.results,
+      objectID: res.data.results.objectID
+    }
   } catch (e) {
     console.log(e)
   }
-  // if (!user) {
-  //   try {
-  //     user = await AlgoliaUsers.getObject(platformSpecificID)
-  //   } catch (err) {
-  //     console.log(e)
-  //   }
-  // }
   console.log('user:', user)
   if (user && user.objectID) {
     user.idToken = sender.idToken
     user.platformSpecific = sender
     user.uid = user.objectID
+    user.organisationID = user.data.organisationID
     if (sender.role) user.role = sender.role
     if (user._highlightResult) delete user._highlightResult
     return user
@@ -246,7 +236,8 @@ fetchUserDataFromDb = function(user) {
     // return AlgoliaUsers.getObject(user)
   } else {
     console.log('object!');
-    return axios.post(process.env.NLP_SERVER + '/get-user', { idToken: user.idToken })
+    res = axios.post(process.env.NLP_SERVER + '/get-user', { idToken: user.idToken })
+    return res.data.results
     // const filters = Object.keys(user).map(key => key + ':\'' + user[key] + '\'').join(' AND ')
     // console.log(filters);
     // return AlgoliaUsers.getFirstFromSearch({ filters: filters})
