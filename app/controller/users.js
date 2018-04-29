@@ -228,7 +228,7 @@ exports.addUserToOrganisation = function(organisationID, user, verifiedEmails) {
 }
 
 
-fetchUserDataFromDb = function(user) {
+fetchUserDataFromDb = async function(user) {
 	logger.trace('fetchUserDataFromDb', user)
   if (typeof user === 'string') {
     console.log('string!');
@@ -236,7 +236,7 @@ fetchUserDataFromDb = function(user) {
     // return AlgoliaUsers.getObject(user)
   } else {
     console.log('object!');
-    res = axios.post(process.env.NLP_SERVER + '/get-user', { idToken: user.idToken })
+    res = await axios.post(process.env.NLP_SERVER + '/get-user', { idToken: user.idToken })
     return res.data.results
     // const filters = Object.keys(user).map(key => key + ':\'' + user[key] + '\'').join(' AND ')
     // console.log(filters);
