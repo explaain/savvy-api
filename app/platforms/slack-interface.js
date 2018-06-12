@@ -358,4 +358,7 @@ const bootUp = async () => {
   })
 }
 
-bootUp()
+// NOTE: Temporarily disabled because it was breaking and ruining the YC demo, with the following error (on live):
+// "error: Disconnecting because account_inactive is not recoverable"
+
+// bootUp()
